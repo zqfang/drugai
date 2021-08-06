@@ -1,0 +1,22 @@
+*.
+.project
+.pydevproject
+*.log
+*build
+*.c
+*.so
+*train
+*test
+*checkpoint
+*data
+# tests
+*.ipynb
+*.ipynb_checkpoints
+*.pytest_cache
+*__pycache__
+*.vscode
+*.DS_Store
+*.idea
+*.snakemake
+*.pth
+bin
