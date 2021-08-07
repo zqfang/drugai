@@ -121,12 +121,15 @@ class DMPNNConv(MessagePassing):
         inp_size = args.hidden_size
         if atom_messages: inp_size += args.b_fdim # FIXME
         
-        self.lin = nn.Linear(inp_size, args.hidden_size)
-        self.relu = nn.ReLU()
-        self.dropout = nn.Dropout(p=0.0)
-        self.mlp = nn.Sequential(nn.Linear(args.hidden_size, args.hidden_size),
+        self.mlp1 = nn.Sequential(nn.Linear(inp_size, args.hidden_size),
+                                  nn.BatchNorm1d(args.hidden_size),
+                                  nn.ReLU(),
+                                  nn.Dropout(0.0))
+
+        self.mlp2 = nn.Sequential(nn.Linear(args.hidden_size, args.hidden_size),
                                  nn.BatchNorm1d(args.hidden_size),
-                                 nn.ReLU())
+                                 nn.ReLU(),
+                                 nn.Dropout(0.0))
         self.tetra = args.tetra
         if self.tetra:
             self.tetra_update = get_tetra_update(args)
@@ -147,26 +150,26 @@ class DMPNNConv(MessagePassing):
             # x: line_graph's node_features (node_graph's edge_attr), set_edge_attr to None 
             a_message = self.propagate(edge_index, x=edge_attr, edge_attr=None,)
             
-        return a_message, self.mlp(a_message)
+        return a_message, self.mlp2(a_message)
+
+    def message(self, x_j, x, edge_attr):
+        if self.atom_messages:
+            # good thing is we concat fwd, rev edge together adjacently. b2a, a2b is esasy to handle then
+            # edge_index must be node_graph, not line_graph
+            x_j = torch.cat([x_j, edge_attr], dim=1) # concat to node_features
+            return self.mlp1(x_j)
+        return self.mlp1(x) # return line_graph's directed_node_attr.
 
     def update(self, aggr_out):
         # if self.atom_messages:
-        ## filp -> Reverse the order of a n-D tensor along given axis in dims
-        ## then reshape to (num_bonds, hidden)
-        rev_message = aggr_out.view(aggr_out.size(0) // 2, 2, -1).flip(dims=[1]).view(aggr_out.size(0), -1)
-        aggr_out -= rev_message
-        aggr_out = self.lin(aggr_out)
-        aggr_out = self.relu(aggr_out)
-        aggr_out = self.dropout(aggr_out)
-        return aggr_out
-
-    def message(self, x_j, edge_attr,):
-        if self.atom_messages:
-            # good thing is we concat fwd, rev edge together adjacently. b2a, a2b is esasy to handle then
-            x_j = torch.repeat_interleave(x_j, repeats=2, dim=0)
-            # x_j = x_j[ edge_index[0] ] # another way to repeat node features, but edge_index must be node_graph, not line_graph
-            x_j = torch.cat([x_j, edge_attr], dim=1) # concat to node_features
-        return x_j
+        if not self.atom_messages:
+            ## filp -> Reverse the order of a n-D tensor along given axis in dims
+            ## then reshape to (num_bonds, hidden)
+            rev_message = aggr_out.view(aggr_out.size(0) // 2, 2, -1).flip(dims=[1]).view(aggr_out.size(0), -1)
+            aggr_out -= rev_message
+        # if atom_message: aggr_out size: [num_nodes, embed_size], 
+        # line_graph: [num_edges, embed_size]
+        return aggr_out # self.mpl2(aggr_out) 
 
 
     def tetra_message(self, x, edge_index, edge_attr, tetra_ids, parity_atoms):

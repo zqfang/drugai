@@ -7,10 +7,10 @@ from rdkit.Chem.rdchem import ChiralType
 import torch
 import numpy as np
 import pandas as pd
-from itertools import chain
+from itertools import chain, accumulate
 
 import torch_geometric as tg
-from torch_geometric.data import Dataset, DataLoader
+from torch_geometric.data import Data, Dataset, DataLoader
 from torch.utils.data.sampler import Sampler
 
 # Atom feature sizes
@@ -231,11 +231,10 @@ class MolGraph:
         so we can use pyg's message passing framework (only works for node_graph)
         
         """
-        import itertools
         # force to directed graph
         bond_index = list(range(len(self.b2a))) # b2a is directed, 1d list, num_bonds X 2
         count = [len(b) for b in self.a2b] # a2b is undirected graph, adjacency list
-        cumsum = [0] + list(itertools.accumulate(count) # atoms' increment index
+        cumsum = [0] + list(accumulate(count) # atoms' increment index
         
         # adjacency list, construct target `node`
         edge_index_linegraph_1 = [ bond_index[ cumsum[self.b2a[j]] : cumsum[self.b2a[j] + 1] ] for j in range(self.b2a) ]
@@ -243,8 +242,8 @@ class MolGraph:
         # adjacency list, get source `node`
         edge_index_linegraph_0 = [ [j]*len(b) for j, b in enumerate(edge_index_linegraph_1) ]
         # flatten, concate list
-        edge_index_linegraph_1 = itertools.chain(*edge_index_linegraph_1)
-        edge_index_linegraph_0 = itertools.chain(*edge_index_linegraph_0)
+        edge_index_linegraph_1 = chain(*edge_index_linegraph_1)
+        edge_index_linegraph_0 = chain(*edge_index_linegraph_0)
         # line_graph's edge_index
         self.edge_index_linegraph = [edge_index_linegraph_0, edge_index_linegraph_1]
         return self.edge_index_linegraph
@@ -331,7 +330,7 @@ class MolDataset(Dataset):
         mol = MolData(molgraph, smi, self.labels[key], self.atom_messages)
         return mol
 
-class MolData(tg.data.Data):
+class MolData(Data):
     def __init__(self, molgraph: MolGraph, smiles: str, 
                        label: Union[int, List[float]], 
                        atom_messages: bool =False):
@@ -343,19 +342,27 @@ class MolData(tg.data.Data):
         self.parity_atoms = torch.tensor(molgraph.parity_atoms, dtype=torch.long)
         self.smiles = smiles
         if not atom_messages:
-            self.edge_index_linegraph = torch.tensor(molgraph.edge_index_linegraph, dtype=torch.long).t().contiguous()
+            self.edge_index_linegraph = torch.tensor(molgraph.edge_index_linegraph, dtype=torch.long).contiguous()
         self.b2a = molgraph.b2a
         self.a2b = molgraph.a2b
 
     def __inc__(self, key, value):
-        if key == "edge_index_linegraph":
-            return self.edge_attr.size(0)
+        """
+        batching increment
+        """
+        if key == "edge_index_linegraph": # directed line_graph
+            return self.edge_attr.size(0) # need to check this !
         elif key == "edge_index":
             return self.x.size(0)
-        else:
-            return super().__inc__(key, value)
+        elif key == "b2a": # incread atom index number
+            return self.x.size(0) 
+
+        return super().__inc__(key, value)
 
     def __cat_dim__(self, key, value):
+        """
+        Batching concate
+        """
         if key == "edge_index_linegraph":
             return 1
         elif key == "edge_index":
@@ -366,6 +373,7 @@ class MolData(tg.data.Data):
             # should be returned as [num_examples, num_features]
             return None #
 
+        return super().__inc__(key, value)
 
 
 class StereoSampler(Sampler):
