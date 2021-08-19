@@ -34,7 +34,7 @@ def optimize(trial, args):
     train_loader, val_loader = construct_loader(args)
 
     # create model, optimizer, scheduler, and loss fn
-    model = GNN(args, train_loader.dataset.num_node_features, train_loader.dataset.num_edge_features).to(args.device)
+    model = GNN(args).to(args.device)
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
     scheduler = build_lr_scheduler(optimizer, args, len(train_loader.dataset))
     loss = get_loss_func(args)
@@ -76,7 +76,7 @@ def optimize(trial, args):
     train_logger.info(f"Best Validation Loss {best_val_loss} on Epoch {best_epoch}")
 
     # load best model
-    model = GNN(args, train_loader.dataset.num_node_features, train_loader.dataset.num_edge_features).to(args.device)
+    model = GNN(args).to(args.device)
     state_dict = torch.load(os.path.join(args.log_dir, 'best_model'), map_location=args.device)
     model.load_state_dict(state_dict)
 

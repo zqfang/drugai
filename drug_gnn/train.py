@@ -3,6 +3,8 @@ import math
 import torch
 import pandas as pd
 
+from torch.utils.tensorboard import SummaryWriter
+
 from model.data import construct_loader
 from model.utils import create_logger, get_loss_func
 
@@ -13,7 +15,7 @@ from model.parsing import parse_train_args
 args = parse_train_args()
 torch.manual_seed(args.seed)
 logger = create_logger('train', args.log_dir)
-
+tb = SummaryWriter(log_dir = args.log_dir)
 train_loader, val_loader = construct_loader(args)
 
 setattr(args, 'num_edge_features', train_loader.dataset.num_edge_features)
@@ -42,14 +44,17 @@ logger.info("Starting training...")
 for epoch in range(0, args.n_epochs):
     train_loss, train_acc = train(model, train_loader, optimizer, loss, args.device, scheduler, args.task)
     logger.info(f"Epoch {epoch}: Training Loss {train_loss}")
-
+    tb.add_scalar('Loss/train', train_loss, epoch) 
     if args.task == 'classification':
         logger.info(f"Epoch {epoch}: Training Classification Accuracy {train_acc}")
+        tb.add_scalar('Classification/train/acc', train_acc, epoch) 
     val_loss, val_acc = eval(model, val_loader, loss, args.device, args.task)
     logger.info(f"Epoch {epoch}: Validation Loss {val_loss}")
+    tb.add_scalar('Loss/train', val_loss, epoch) 
 
     if args.task == 'classification':
         logger.info(f"Epoch {epoch}: Validation Classification Accuracy {val_acc}")
+        tb.add_scalar('Classification/train/acc', val_acc, epoch)
 
     if val_loss <= best_val_loss:
         best_val_loss = val_loss
@@ -59,7 +64,7 @@ for epoch in range(0, args.n_epochs):
 logger.info(f"Best Validation Loss {best_val_loss} on Epoch {best_epoch}")
 
 # load best model
-model = GNN(args, train_loader.dataset.num_node_features, train_loader.dataset.num_edge_features).to(args.device)
+model = GNN(args).to(args.device)
 state_dict = torch.load(os.path.join(args.log_dir, 'best_model'), map_location=args.device)
 model.load_state_dict(state_dict)
 
@@ -75,3 +80,4 @@ if args.task == 'classification':
 smiles = test_loader.dataset.smiles
 preds_path = os.path.join(args.log_dir, 'preds.csv')
 pd.DataFrame(list(zip(smiles, preds)), columns=['smiles', 'prediction']).to_csv(preds_path, index=False)
+tb.close()
