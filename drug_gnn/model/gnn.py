@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from torch_geometric.nn import global_add_pool, global_mean_pool, global_max_pool, GlobalAttention, Set2Set
-from .layers import GCNConv, GINEConv, DMPNNConv, DMPNNConv2
+from model.layers import GCNConv, GINEConv, DMPNNConv, DMPNNConv2
 
 
 class GNN(nn.Module):

@@ -17,7 +17,7 @@ logger = create_logger('train', args.log_dir)
 train_loader, val_loader = construct_loader(args)
 
 setattr(args, 'num_edge_features', train_loader.dataset.num_edge_features)
-setattr(args,'num_node_features', train_loader.dataset.num_node_features)
+setattr(args, 'num_node_features', train_loader.dataset.num_node_features)
 # create model, optimizer, scheduler, and loss fn
 model = GNN(args).to(args.device)
 optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
