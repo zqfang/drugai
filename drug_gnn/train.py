@@ -26,6 +26,7 @@ loss = get_loss_func(args)
 best_val_loss = math.inf
 best_epoch = 0
 
+print(model)
 # record args, optimizer, and scheduler info
 logger.info('Arguments are...')
 for arg in vars(args):

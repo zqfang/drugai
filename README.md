@@ -11,7 +11,10 @@ This repo implements [DMPNN](https://pubs.acs.org/doi/10.1021/acs.jcim.9b00237) 
 
 
 ## Dependency
-
+- numpy
+- pandas
+- scikit-learn
+- optuna: hyperparameter search
 - python >= 3.7
 - Pytorch >= 1.5
 - Pytorch Geometric >= 1.7

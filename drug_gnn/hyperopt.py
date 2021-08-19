@@ -9,7 +9,7 @@ from argparse import ArgumentParser
 import logging
 
 from model.data import construct_loader
-from model.utils import Standardizer, create_logger, get_loss_func
+from model.utils import create_logger, get_loss_func
 
 from model.gnn import GNN
 from model.training import train, eval, test, build_lr_scheduler

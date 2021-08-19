@@ -122,13 +122,13 @@ def construct_loader(args, modes=('train', 'val')):
     if isinstance(modes, str):
         modes = [modes]
 
-    # data_df = pd.read_pickle(args.data_path)
-    # smiles = data_df.index.to_list()
-    # labels = data_df.values.astype(np.float32)
+    data_df = pd.read_pickle(args.data_path)
+    smiles = data_df.index.to_list()
+    labels = data_df.values.astype(np.float32)
 
-    data_df = pd.read_csv(args.data_path)
-    smiles = data_df.iloc[:, 0].values
-    labels = data_df.iloc[:, 1:].values
+    # data_df = pd.read_csv(args.data_path)
+    # smiles = data_df.iloc[:, 0].values
+    # labels = data_df.iloc[:, 1:].values
     # FIXME: 
     if args.task == 'classification':
         args.output_size = len(np.unique(labels))
