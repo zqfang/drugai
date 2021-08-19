@@ -40,9 +40,9 @@ def get_loss_func(args: Namespace) -> nn.Module:
     :return: A PyTorch loss function.
     """
     if args.task == 'classification':
-        return nn.BCELoss(reduction='sum')
+        return nn.CrossEntropyLoss()
 
     if args.task == 'regression':
-        return nn.MSELoss(reduction='sum')
+        return nn.MSELoss()
 
     raise ValueError(f'Dataset type "{args.task}" not supported.')

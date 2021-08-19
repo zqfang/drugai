@@ -27,7 +27,7 @@ class GCNConv(MessagePassing):
 
         x = x_new + F.relu(x)
 
-        return self.batch_norm(x), edge_attr
+        return self.batch_norm(x)
 
     def message(self, x_j, edge_attr, norm):
         return norm.view(-1, 1) * F.relu(x_j + edge_attr)
@@ -49,7 +49,7 @@ class GINEConv(MessagePassing):
         x_new = self.propagate(edge_index, x=x, edge_attr=edge_attr)
 
         x = self.mlp((1 + self.eps) * x + x_new)
-        return self.batch_norm(x), edge_attr
+        return self.batch_norm(x)
 
     def message(self, x_j, edge_attr):
         return F.relu(x_j + edge_attr)
@@ -103,7 +103,8 @@ class DMPNNConv2(MessagePassing):
         self.mlp = nn.Sequential(nn.Linear(args.num_node_features + args.hidden_size, args.hidden_size),
                                   nn.BatchNorm1d(args.hidden_size),
                                   nn.ReLU(),
-                                  nn.Dropout(args.dropout))        
+                                  #nn.Dropout(args.dropout)
+                                  )        
     def forward(self, x, edge_index, edge_attr, x0):
         """
         x0: raw bond features
@@ -112,7 +113,7 @@ class DMPNNConv2(MessagePassing):
         return a_message
 
     def message(self, x_j, edge_attr):
-        if self.atom_messages and self.node_message:
+        if self.atom_messages and self.node_messages:
             return x_j
         return edge_attr 
 

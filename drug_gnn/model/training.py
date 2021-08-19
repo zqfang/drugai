@@ -26,7 +26,7 @@ def train(model, loader, optimizer, loss, device, scheduler, task):
         loss_all += result.item()
 
         if task == 'classification':
-            predicted = torch.round(out.data)
+            predicted = torch.softmax(out.detach(), dim=1).argmax(dim=1)
             correct += (predicted == data.y).sum().double()
 
     if task == 'regression':
@@ -47,7 +47,7 @@ def eval(model, loader, loss, device, task):
             error += loss(out, data.y).item()
 
             if task == 'classification':
-                predicted = torch.round(out.data)
+                predicted = torch.softmax(out.detach(), dim=1).argmax(dim=1)
                 correct += (predicted == data.y).sum().double()
 
     if task == 'regression':
@@ -65,12 +65,12 @@ def test(model, loader, loss, device, task):
     with torch.no_grad():
         for data in tqdm(loader, total=len(loader)):
             data = data.to(device)
-            pred = model(data)
+            out = model(data)
             error += loss(out, data.y).item()
-            preds.extend(pred.detach().cpu().tolist())
+            preds.extend(out.detach().cpu().tolist())
 
             if task == 'classification':
-                predicted = torch.round(pred.data)
+                predicted = torch.softmax(out.detach(), dim=1).argmax(dim=1)
                 correct += (predicted == data.y).sum().double()
                 ys.extend(data.y.detach().cpu().tolist())
 

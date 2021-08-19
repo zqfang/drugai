@@ -69,7 +69,7 @@ class MolDataset(Dataset):
         self.smiles = [smiles[i] for i in self.split]
         self.labels = [labels[i] for i in self.split]
         self.data_map = {k: v for k, v in zip(range(len(self.smiles)), self.split)}
-        self.args = args
+        self.task = args.task
         self.atom_messages = atom_messages
 
         # if mode == 'train':
@@ -81,7 +81,7 @@ class MolDataset(Dataset):
         data.x = torch.tensor(molgraph.f_atoms, dtype=torch.float)
         data.edge_index = torch.tensor(molgraph.edge_index, dtype=torch.long).t().contiguous()
         data.edge_attr = torch.tensor(molgraph.f_bonds, dtype=torch.float)
-        data.y = torch.tensor([self.labels[key]], dtype=torch.float)
+        data.y = torch.tensor([self.labels[key]], dtype= torch.long if self.task == 'classification' else torch.float)
         data.smiles = self.smiles[key]
         return data
 
@@ -122,14 +122,20 @@ def construct_loader(args, modes=('train', 'val')):
     if isinstance(modes, str):
         modes = [modes]
 
-    data_df = pd.read_pickle(args.data_path)
+    # data_df = pd.read_pickle(args.data_path)
+    # smiles = data_df.index.to_list()
+    # labels = data_df.values.astype(np.float32)
 
-    # smiles = data_df.iloc[:, 0].values
-    # labels = data_df.iloc[:, 1].values.astype(np.float32)
-    # FIXME
-    smiles = data_df.index.to_list()
-    labels = data_df.values.astype(np.float32)
-    args.y_dim = labels.shape[1]
+    data_df = pd.read_csv(args.data_path)
+    smiles = data_df.iloc[:, 0].values
+    labels = data_df.iloc[:, 1:].values
+    # FIXME: 
+    if args.task == 'classification':
+        args.output_size = len(np.unique(labels))
+        labels = np.squeeze(labels).astype(int)
+    else:
+        args.output_size = labels.shape[1]
+        labels = labels.astype(np.float32)
     loaders = []
     for mode in modes:
         dataset = MolDataset(smiles, labels, args, mode)
