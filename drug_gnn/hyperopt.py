@@ -8,8 +8,8 @@ import joblib
 from argparse import ArgumentParser
 import logging
 
-from features.featurization import construct_loader
-from utils import Standardizer, create_logger, get_loss_func
+from model.data import construct_loader
+from model.utils import Standardizer, create_logger, get_loss_func
 
 from model.gnn import GNN
 from model.training import train, eval, test, build_lr_scheduler
@@ -32,9 +32,6 @@ def optimize(trial, args):
     train_logger = create_logger('train', args.log_dir)
 
     train_loader, val_loader = construct_loader(args)
-    mean = train_loader.dataset.mean
-    std = train_loader.dataset.std
-    stdzer = Standardizer(mean, std, args.task)
 
     # create model, optimizer, scheduler, and loss fn
     model = GNN(args, train_loader.dataset.num_node_features, train_loader.dataset.num_edge_features).to(args.device)
@@ -57,10 +54,10 @@ def optimize(trial, args):
     # train
     train_logger.info("Starting training...")
     for epoch in range(0, args.n_epochs):
-        train_loss, train_acc = train(model, train_loader, optimizer, loss, stdzer, args.device, scheduler, args.task)
+        train_loss, train_acc = train(model, train_loader, optimizer, loss, args.device, scheduler, args.task)
         train_logger.info(f"Epoch {epoch}: Training Loss {train_loss}")
 
-        val_loss, val_acc = eval(model, val_loader, loss, stdzer, args.device, args.task)
+        val_loss, val_acc = eval(model, val_loader, loss, args.device, args.task)
         train_logger.info(f"Epoch {epoch}: Validation Loss {val_loss}")
 
         if val_loss <= best_val_loss:
@@ -85,7 +82,7 @@ def optimize(trial, args):
 
     # predict test data
     test_loader = construct_loader(args, modes='test')
-    preds, test_loss, test_acc, test_auc = test(model, test_loader, loss, stdzer, args.device, args.task)
+    preds, test_loss, test_acc, test_auc = test(model, test_loader, loss, args.device, args.task)
     train_logger.info(f"Test Loss {test_loss}")
 
     # save predictions

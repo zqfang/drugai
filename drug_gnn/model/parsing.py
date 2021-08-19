@@ -9,6 +9,8 @@ def add_train_args(parser: ArgumentParser):
     :param parser: An ArgumentParser.
     """
     # General arguments
+    parser.add_argument('--mode',  type=str, default='train',
+                        choices=['train','eval'], help='training or evaluating')
     parser.add_argument('--data_path', type=str,
                         help='Path to data CSV file')
     parser.add_argument('--split_path', type=str,
@@ -45,6 +47,8 @@ def add_train_args(parser: ArgumentParser):
                         help='Type of gnn to use')
     parser.add_argument('--hidden_size', type=int, default=300,
                         help='Dimensionality of hidden layers in MPN')
+    parser.add_argument('--ffn_hidden_size', type=int, default=300,
+                        help='Dimensionality of hidden layers in FFN')
     parser.add_argument('--depth', type=int, default=3,
                         help='Number of message passing steps')
     parser.add_argument('--dropout', type=float, default=0.2,
@@ -52,14 +56,8 @@ def add_train_args(parser: ArgumentParser):
     parser.add_argument('--graph_pool', type=str, default='sum',
                         choices=['sum', 'mean', 'max', 'attn', 'set2set'],
                         help='How to aggregate atom representations to molecule representation')
-    parser.add_argument('--message', type=str, default='sum',
-                        choices=['sum', 'tetra_pd', 'tetra_permute', 'tetra_permute_concat'],
-                        help='How to pass neighbor messages')
-    parser.add_argument('--chiral_features', action='store_true', default=False,
-                        help='Use local chiral atom features')
-    parser.add_argument('--global_chiral_features', action='store_true', default=False,
-                        help='Use global chiral atom features')
-
+    parser.add_argument('--atom_messages', action='store_true', default=False,
+                        help='atom center messages, instead of edge messages')
 
 def modify_train_args(args: Namespace):
     """
@@ -67,15 +65,9 @@ def modify_train_args(args: Namespace):
 
     :param args: Arguments.
     """
-    if args.message.startswith('tetra'):
-        setattr(args, 'tetra', True)
-    else:
-        setattr(args, 'tetra', False)
-
     # shuffle=False for custom sampler
     if args.shuffle_pairs:
         setattr(args, 'no_shuffle', True)
-
     setattr(args, 'device', torch.device('cuda' if torch.cuda.is_available() else 'cpu'))
 
 

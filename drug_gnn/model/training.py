@@ -1,5 +1,5 @@
 import math
-from tqdm import tqdm
+from tqdm.auto import tqdm
 from typing import List, Union
 from argparse import Namespace
 import numpy as np
@@ -8,37 +8,35 @@ import torch
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import _LRScheduler
 from sklearn.metrics import roc_auc_score
-from torch_geometric.transforms.line_graph import LineGraph
 
-def train(model, loader, optimizer, loss, stdzer, device, scheduler, task):
+
+def train(model, loader, optimizer, loss, device, scheduler, task):
     model.train()
     loss_all, correct = 0, 0
     for data in tqdm(loader, total=len(loader)):
-        #lg = LineGraph()
-        data_lg =  LineGraph()(data.clone())
         data = data.to(device)
         optimizer.zero_grad()
 
         out = model(data)
-        result = loss(out, stdzer(data.y))
+        result = loss(out, data.y)
         result.backward()
 
         optimizer.step()
         scheduler.step()
-        loss_all += loss(stdzer(out, rev=True), data.y)
+        loss_all += result.item()
 
         if task == 'classification':
             predicted = torch.round(out.data)
             correct += (predicted == data.y).sum().double()
 
     if task == 'regression':
-        
-        return math.sqrt(loss_all / len(loader.dataset)), None  # rmse
+        # rmse
+        return math.sqrt(loss_all / len(loader.dataset)), None  
     elif task == 'classification':
         return loss_all / len(loader.dataset), correct / len(loader.dataset)
 
 
-def eval(model, loader, loss, stdzer, device, task):
+def eval(model, loader, loss, device, task):
     model.eval()
     error, correct = 0, 0
 
@@ -46,19 +44,20 @@ def eval(model, loader, loss, stdzer, device, task):
         for data in tqdm(loader, total=len(loader)):
             data = data.to(device)
             out = model(data)
-            error += loss(stdzer(out, rev=True), data.y).item()
+            error += loss(out, data.y).item()
 
             if task == 'classification':
                 predicted = torch.round(out.data)
                 correct += (predicted == data.y).sum().double()
 
     if task == 'regression':
-        return math.sqrt(error / len(loader.dataset)), None  # rmse
+        # rmse
+        return math.sqrt(error / len(loader.dataset)), None  
     elif task == 'classification':
         return error / len(loader.dataset), correct / len(loader.dataset)
 
 
-def test(model, loader, loss, stdzer, device, task):
+def test(model, loader, loss, device, task):
     model.eval()
     error, correct = 0, 0
 
@@ -66,15 +65,14 @@ def test(model, loader, loss, stdzer, device, task):
     with torch.no_grad():
         for data in tqdm(loader, total=len(loader)):
             data = data.to(device)
-            out = model(data)
-            pred = stdzer(out, rev=True)
-            error += loss(pred, data.y).item()
-            preds.extend(pred.cpu().detach().tolist())
+            pred = model(data)
+            error += loss(out, data.y).item()
+            preds.extend(pred.detach().cpu().tolist())
 
             if task == 'classification':
-                predicted = torch.round(out.data)
+                predicted = torch.round(pred.data)
                 correct += (predicted == data.y).sum().double()
-                ys.extend(data.y.cpu().detach().tolist())
+                ys.extend(data.y.detach().cpu().tolist())
 
     if task == 'regression':
         return preds, math.sqrt(error / len(loader.dataset)), None, None  # rmse

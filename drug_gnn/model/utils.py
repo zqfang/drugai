@@ -4,20 +4,6 @@ from argparse import Namespace
 from torch import nn
 
 
-class Standardizer:
-    def __init__(self, mean, std, task='regression'):
-        if task == 'regression':
-            self.mean = mean
-            self.std = std
-        elif task == 'classification':
-            self.mean = 0
-            self.std = 1
-
-    def __call__(self, x, rev=False):
-        if rev:
-            return (x * self.std) + self.mean
-        return (x - self.mean) / self.std
-
 
 def create_logger(name: str, log_dir: str = None) -> logging.Logger:
     """

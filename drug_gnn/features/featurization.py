@@ -1,17 +1,25 @@
+
 from typing import List, Tuple, Union
-from itertools import zip_longest
-from rdkit import Chem
+
+
 import torch
 import numpy as np
-from chemprop.rdkit import make_mol
+import pandas as pd
+
+from itertools import chain, accumulate
+from rdkit import Chem
+
+
 
 # Atom feature sizes
-MAX_ATOMIC_NUM = 100
+MAX_ATOMIC_NUM = 100 # FIXME: MAX_ATOMIC_NUM
+CIP_CHIRALITY = ['R', 'S']
 ATOM_FEATURES = {
     'atomic_num': list(range(MAX_ATOMIC_NUM)),
     'degree': [0, 1, 2, 3, 4, 5],
     'formal_charge': [-1, -2, 1, 2, 0],
     'chiral_tag': [0, 1, 2, 3],
+    #'global_chiral_tag': ['R', 'S'],
     'num_Hs': [0, 1, 2, 3, 4],
     'hybridization': [
         Chem.rdchem.HybridizationType.SP,
@@ -20,6 +28,13 @@ ATOM_FEATURES = {
         Chem.rdchem.HybridizationType.SP3D,
         Chem.rdchem.HybridizationType.SP3D2
     ],
+}
+
+CHIRALTAG_PARITY = {
+    Chem.rdchem.ChiralType.CHI_TETRAHEDRAL_CW: +1,
+    Chem.rdchem.ChiralType.CHI_TETRAHEDRAL_CCW: -1,
+    Chem.rdchem.ChiralType.CHI_UNSPECIFIED: 0,
+    Chem.rdchem.ChiralType.CHI_OTHER: 0, # default
 }
 
 # Distance feature sizes
@@ -31,12 +46,26 @@ THREE_D_DISTANCE_BINS = list(range(0, THREE_D_DISTANCE_MAX + 1, THREE_D_DISTANCE
 # len(choices) + 1 to include room for uncommon values; + 2 at end for IsAromatic and mass
 ATOM_FDIM = sum(len(choices) + 1 for choices in ATOM_FEATURES.values()) + 2
 EXTRA_ATOM_FDIM = 0
-BOND_FDIM = 14
+BOND_FDIM = 14  # FIXME
 EXTRA_BOND_FDIM = 0
 REACTION_MODE = None
 EXPLICIT_H = False
 REACTION = False
 
+def make_mol(s: str, keep_h: bool):
+    """
+    Builds an RDKit molecule from a SMILES string.
+    
+    :param s: SMILES string.
+    :param keep_h: Boolean whether to keep hydrogens in the input smiles. This does not add hydrogens, it only keeps them if they are specified.
+    :return: RDKit molecule.
+    """
+    if keep_h:
+        mol = Chem.MolFromSmiles(s, sanitize = False)
+        Chem.SanitizeMol(mol, sanitizeOps = Chem.SanitizeFlags.SANITIZE_ALL^Chem.SanitizeFlags.SANITIZE_ADJUSTHS)
+    else:
+        mol = Chem.MolFromSmiles(s)
+    return mol
 
 def get_atom_fdim(overwrite_default_atom: bool = False) -> int:
     """
@@ -158,6 +187,14 @@ def atom_features(atom: Chem.rdchem.Atom, functional_groups: List[int] = None) -
             onek_encoding_unk(int(atom.GetHybridization()), ATOM_FEATURES['hybridization']) + \
             [1 if atom.GetIsAromatic() else 0] + \
             [atom.GetMass() * 0.01]  # scaled to about the same range as other features
+        # if args.chiral_features:
+        #     features += onek_encoding_unk(int(atom.GetChiralTag()), ATOM_FEATURES['chiral_tag'])
+        # if args.global_chiral_features:
+        #     if atom.HasProp('_CIPCode'):
+        #         features += onek_encoding_unk(atom.GetProp('_CIPCode'), ATOM_FEATURES['global_chiral_tag'])
+        #     else:
+        #         features += onek_encoding_unk(None, ATOM_FEATURES['global_chiral_tag'])
+
         if functional_groups is not None:
             features += functional_groups
     return features
@@ -186,39 +223,15 @@ def bond_features(bond: Chem.rdchem.Bond) -> List[Union[bool, int, float]]:
         fbond += onek_encoding_unk(int(bond.GetStereo()), list(range(6)))
     return fbond
 
-
-def map_reac_to_prod(mol_reac: Chem.Mol, mol_prod: Chem.Mol):
+def parity_features(atom: Chem.rdchem.Atom) -> int:
     """
-    Build a dictionary of mapping atom indices in the reactants to the products.
+    Returns the parity of an atom if it is a tetrahedral center.
+    +1 if CW, -1 if CCW, and 0 if undefined/unknown
 
-    :param mol_reac: An RDKit molecule of the reactants.
-    :param mol_prod: An RDKit molecule of the products.
-    :return: A dictionary of corresponding reactant and product atom indices.
+    :param atom: An RDKit atom.
     """
-    only_prod_ids = []
-    prod_map_to_id = {}
-    mapnos_reac = set([atom.GetAtomMapNum() for atom in mol_reac.GetAtoms()]) 
-    for atom in mol_prod.GetAtoms():
-        mapno = atom.GetAtomMapNum()
-        if mapno > 0:
-            prod_map_to_id[mapno] = atom.GetIdx()
-            if mapno not in mapnos_reac:
-                only_prod_ids.append(atom.GetIdx()) 
-        else:
-            only_prod_ids.append(atom.GetIdx())
-    only_reac_ids = []
-    reac_id_to_prod_id = {}
-    for atom in mol_reac.GetAtoms():
-        mapno = atom.GetAtomMapNum()
-        if mapno > 0:
-            try:
-                reac_id_to_prod_id[atom.GetIdx()] = prod_map_to_id[mapno]
-            except KeyError:
-                only_reac_ids.append(atom.GetIdx())
-        else:
-            only_reac_ids.append(atom.GetIdx())
-    return reac_id_to_prod_id, only_prod_ids, only_reac_ids
-
+    return CHIRALTAG_PARITY[atom.GetChiralTag()]
+    
 
 class MolGraph:
     """
@@ -260,6 +273,7 @@ class MolGraph:
             else:
                 mol = make_mol(mol, self.is_explicit_h)
 
+        self.smiles = Chem.MolToSmiles(mol)
         self.n_atoms = 0  # number of atoms
         self.n_bonds = 0  # number of bonds
         self.f_atoms = []  # mapping from atom index to atom features
@@ -267,8 +281,12 @@ class MolGraph:
         self.a2b = []  # mapping from atom index to incoming bond indices
         self.b2a = []  # mapping from bond index to the index of the atom the bond is coming from
         self.b2revb = []  # mapping from bond index to the index of the reverse bond
+        self.edge_index = []
         self.overwrite_default_atom_features = overwrite_default_atom_features
         self.overwrite_default_bond_features = overwrite_default_bond_features
+        self.f_bonds_dim = 0
+        # Convert smiles to molecule
+        # mol = Chem.MolFromSmiles(mol)
 
         if not self.is_reaction:
             # Get atom features
@@ -295,6 +313,8 @@ class MolGraph:
 
                     if bond is None:
                         continue
+                    # edge_index 
+                    self.edge_index.extend([(a1, a2), (a2, a1)])
 
                     f_bond = bond_features(bond)
                     if bond_features_extra is not None:
@@ -304,8 +324,13 @@ class MolGraph:
                         else:
                             f_bond += descr
 
-                    self.f_bonds.append(self.f_atoms[a1] + f_bond) # fwd:  a1--> a2, cat atom and bond features
-                    self.f_bonds.append(self.f_atoms[a2] + f_bond) # rev:  a2--> a1
+                    # append twice for fwd, rev bond, atom feature only append once
+                    #self.f_bonds.append(self.f_atoms[a1] + f_bond) # fwd:  a1--> a2, cat atom and bond features
+                    #self.f_bonds.append(self.f_atoms[a2] + f_bond) # rev:  a2--> a1
+
+                    # maybe this is more useful for neural network, instead concat directly above
+                    self.f_bonds.append(f_bond)
+                    self.f_bonds.append(f_bond)
 
                     # Update index mappings
                     b1 = self.n_bonds # init 0, bond index
@@ -322,10 +347,6 @@ class MolGraph:
             if bond_features_extra is not None and len(bond_features_extra) != self.n_bonds / 2:
                 raise ValueError(f'The number of bonds in {Chem.MolToSmiles(mol)} is different from the length of '
                                  f'the extra bond features')
-            
-
-            
-
            
         else: # Reaction mode
             if atom_features_extra is not None:
@@ -401,71 +422,32 @@ class MolGraph:
                     self.b2a.append(a2)
                     self.b2revb.append(b2)
                     self.b2revb.append(b1)
-                    self.n_bonds += 2                
+                    self.n_bonds += 2  
 
-class BatchMolGraph:
-    """
-    A :class:`BatchMolGraph` represents the graph structure and featurization of a batch of molecules.
-
-    A BatchMolGraph contains the attributes of a :class:`MolGraph` plus:
-
-    * :code:`atom_fdim`: The dimensionality of the atom feature vector.
-    * :code:`bond_fdim`: The dimensionality of the bond feature vector (technically the combined atom/bond features).
-    * :code:`a_scope`: A list of tuples indicating the start and end atom indices for each molecule.
-    * :code:`b_scope`: A list of tuples indicating the start and end bond indices for each molecule.
-    * :code:`max_num_bonds`: The maximum number of bonds neighboring an atom in this batch.
-    * :code:`b2b`: (Optional) A mapping from a bond index to incoming bond indices.
-    * :code:`a2a`: (Optional): A mapping from an atom index to neighboring atom indices.
-    """
-
-    def __init__(self, mol_graphs: List[MolGraph]):
-        r"""
-        :param mol_graphs: A list of :class:`MolGraph`\ s from which to construct the :class:`BatchMolGraph`.
+    def node2linegraph(self) -> Tuple[List[int], List[int]]:
         """
-        self.overwrite_default_atom_features = mol_graphs[0].overwrite_default_atom_features
-        self.overwrite_default_bond_features = mol_graphs[0].overwrite_default_bond_features
-        self.atom_fdim = get_atom_fdim(overwrite_default_atom=self.overwrite_default_atom_features)
-        self.bond_fdim = get_bond_fdim(overwrite_default_bond=self.overwrite_default_bond_features,
-                                       overwrite_default_atom=self.overwrite_default_atom_features)
+        Inspired by torch_geometric.transforms.line_graph.
 
-        # Start n_atoms and n_bonds at 1 b/c zero padding
-        self.n_atoms = 1  # number of atoms (start at 1 b/c need index 0 as padding)
-        self.n_bonds = 1  # number of bonds (start at 1 b/c need index 0 as padding)
-        self.a_scope = []  # list of tuples indicating (start_atom_index, num_atoms) for each molecule
-        self.b_scope = []  # list of tuples indicating (start_bond_index, num_bonds) for each molecule
+        To do edge message passing, we need to convert to line_graph (edge become node, edge_attr become node_attr), 
+        so we can use pyg's message passing framework (only works for node_graph)
+        
+        """
+        # force to directed graph
+        bond_index = list(range(len(self.b2a))) # b2a is directed, 1d list, num_bonds X 2
+        count = [len(b) for b in self.a2b] # a2b is undirected graph, adjacency list
+        cumsum = [0] + list(accumulate(count)) # atoms' increment index
+        
+        # adjacency list, construct target `node`
+        edge_index_linegraph_1 = [ bond_index[ cumsum[self.b2a[j]] : cumsum[self.b2a[j] + 1] ] for j in range(self.b2a) ]
 
-        # All start with zero padding so that indexing with zero padding returns zeros
-        f_atoms = [[0] * self.atom_fdim]  # atom features
-        f_bonds = [[0] * self.bond_fdim]  # combined atom/bond features
-        a2b = [[]]  # mapping from atom index to incoming bond indices
-        b2a = [0]  # mapping from bond index to the index of the atom the bond is coming from
-        b2revb = [0]  # mapping from bond index to the index of the reverse bond
-        for mol_graph in mol_graphs:
-            f_atoms.extend(mol_graph.f_atoms)
-            f_bonds.extend(mol_graph.f_bonds)
-
-            for a in range(mol_graph.n_atoms):
-                a2b.append([b + self.n_bonds for b in mol_graph.a2b[a]])
-
-            for b in range(mol_graph.n_bonds):
-                b2a.append(self.n_atoms + mol_graph.b2a[b])
-                b2revb.append(self.n_bonds + mol_graph.b2revb[b])
-
-            self.a_scope.append((self.n_atoms, mol_graph.n_atoms))
-            self.b_scope.append((self.n_bonds, mol_graph.n_bonds))
-            self.n_atoms += mol_graph.n_atoms
-            self.n_bonds += mol_graph.n_bonds
-
-        self.max_num_bonds = max(1, max(
-            len(in_bonds) for in_bonds in a2b))  # max with 1 to fix a crash in rare case of all single-heavy-atom mols
-
-        self.f_atoms = torch.FloatTensor(f_atoms)
-        self.f_bonds = torch.FloatTensor(f_bonds)
-        self.a2b = torch.LongTensor([a2b[a] + [0] * (self.max_num_bonds - len(a2b[a])) for a in range(self.n_atoms)])
-        self.b2a = torch.LongTensor(b2a)
-        self.b2revb = torch.LongTensor(b2revb)
-        self.b2b = None  # try to avoid computing b2b b/c O(n_atoms^3)
-        self.a2a = None  # only needed if using atom messages
+        # adjacency list, get source `node`
+        edge_index_linegraph_0 = [ [j]*len(b) for j, b in enumerate(edge_index_linegraph_1) ]
+        # flatten, concate list
+        edge_index_linegraph_1 = chain(*edge_index_linegraph_1)
+        edge_index_linegraph_0 = chain(*edge_index_linegraph_0)
+        # line_graph's edge_index
+        self.edge_index_linegraph = [edge_index_linegraph_0, edge_index_linegraph_1]
+        return self.edge_index_linegraph
 
     def get_components(self, atom_messages: bool = False) -> Tuple[torch.FloatTensor, torch.FloatTensor,
                                                                    torch.LongTensor, torch.LongTensor, torch.LongTensor,
@@ -495,7 +477,7 @@ class BatchMolGraph:
         else:
             f_bonds = self.f_bonds
 
-        return self.f_atoms, f_bonds, self.a2b, self.b2a, self.b2revb, self.a_scope, self.b_scope
+        return self.f_atoms, f_bonds, self.a2b, self.b2a, self.b2revb #, self.a_scope, self.b_scope
 
     def get_b2b(self) -> torch.LongTensor:
         """
@@ -525,26 +507,3 @@ class BatchMolGraph:
             self.a2a = self.b2a[self.a2b]  # num_atoms x max_num_bonds
 
         return self.a2a
-
-
-def mol2graph(mols: Union[List[str], List[Chem.Mol], List[Tuple[Chem.Mol, Chem.Mol]]],
-              atom_features_batch: List[np.array] = (None,),
-              bond_features_batch: List[np.array] = (None,),
-              overwrite_default_atom_features: bool = False,
-              overwrite_default_bond_features: bool = False
-              ) -> BatchMolGraph:
-    """
-    Converts a list of SMILES or RDKit molecules to a :class:`BatchMolGraph` containing the batch of molecular graphs.
-
-    :param mols: A list of SMILES or a list of RDKit molecules.
-    :param atom_features_batch: A list of 2D numpy array containing additional atom features to featurize the molecule
-    :param bond_features_batch: A list of 2D numpy array containing additional bond features to featurize the molecule
-    :param overwrite_default_atom_features: Boolean to overwrite default atom descriptors by atom_descriptors instead of concatenating
-    :param overwrite_default_bond_features: Boolean to overwrite default bond descriptors by bond_descriptors instead of concatenating
-    :return: A :class:`BatchMolGraph` containing the combined molecular graph for the molecules.
-    """
-    return BatchMolGraph([MolGraph(mol, af, bf,
-                                   overwrite_default_atom_features=overwrite_default_atom_features,
-                                   overwrite_default_bond_features=overwrite_default_bond_features)
-                          for mol, af, bf
-                          in zip_longest(mols, atom_features_batch, bond_features_batch)])
