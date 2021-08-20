@@ -23,12 +23,13 @@ Three GCNs are included:
 ## Usage
 
 ### Data Preprocess
-Need two file
-1. a tabular data table with
+
+Need at least one file
+1. a csv file with
   - first column: SIMILES
   - second to last column: float (regression), int (classification)
 
-2. a tuple (train, test, val) of row indices to split the data.
+2. (optional) a pickle file with a tuple (train, test, val) of row indices (splits).
 
 ### Train
 ```shell
