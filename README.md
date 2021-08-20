@@ -22,7 +22,15 @@ Three GCNs are included:
 
 ## Usage
 
-Train:
+### Data Preprocess
+Need two file
+1. a tabular data table with
+  - first column: SIMILES
+  - second to last column: float (regression), int (classification)
+
+2. a tuple (train, test, val) of row indices to split the data.
+
+### Train
 ```shell
 python drug_gnn/train.py --data_path ${data} --split_path ${split} \
                         --task ${regression} \
@@ -30,7 +38,7 @@ python drug_gnn/train.py --data_path ${data} --split_path ${split} \
                         --n_epochs 50 --batch_size 50
 ```
 
-Evaluation:
+### Evaluation
 ```shell
 python drug_gnn/eval.py --data_path ${data} --split_path ${split} \
                         --task ${regression} \
@@ -38,7 +46,7 @@ python drug_gnn/eval.py --data_path ${data} --split_path ${split} \
                         --n_epochs 50 --batch_size 50
 ```
 
-Hyperparameter tuning:
+### Hyperparameter tuning
 ```shell
 python drug_gnn/hyperopt.py --data_path ${data} --task ${regression}  \
                             --gnn_type dmpnn --n_epochs 30 \
