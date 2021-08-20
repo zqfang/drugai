@@ -1,13 +1,12 @@
-# DrugAI
+# Drug GNN
 Drug discovery using Graph Neural Network
 
-## What
+This is a `Pytorch Geometric` implementation of the paper [Chemprop](https://pubs.acs.org/doi/10.1021/acs.jcim.9b00237).
 
-This repo implements [DMPNN](https://pubs.acs.org/doi/10.1021/acs.jcim.9b00237) and more using `Pytorch Geometric`, including
-
+Three GCNs are included:
 - [DMPNN](https://pubs.acs.org/doi/10.1021/acs.jcim.9b00237):
 - [GCN](https://arxiv.org/abs/1609.02907)
-- [GINE](https://arxiv.org/abs/1905.12265>)
+- [GIN](https://arxiv.org/abs/1905.12265>), see also [GINEConv](https://pytorch-geometric.readthedocs.io/en/latest/_modules/torch_geometric/nn/conv/gin_conv.html)
 
 
 ## Dependency
@@ -23,19 +22,29 @@ This repo implements [DMPNN](https://pubs.acs.org/doi/10.1021/acs.jcim.9b00237) 
 
 ## Usage
 
-Train
+Train:
 ```shell
-python drug_gnn train.py --data_path ${data} --task ${regression} \
-                         --gnn_type {dmpnn, gcn, gin} --log_dir checkpoints \
-                         --n_epochs 50 --batch_size 50
+python drug_gnn/train.py --data_path ${data} --split_path ${split} \
+                        --task ${regression} \
+                        --gnn_type {dmpnn, gcn, gin} --log_dir checkpoints \
+                        --n_epochs 50 --batch_size 50
 ```
 
-Eval
+Evaluation:
 ```shell
-python drug_gnn eval.py --data_path ${data} --task ${regression} \
-                         --gnn_type {dmpnn, gcn, gin} --log_dir checkpoints \
-                         --n_epochs 50 --batch_size 50
+python drug_gnn/eval.py --data_path ${data} --split_path ${split} \
+                        --task ${regression} \
+                        --gnn_type {dmpnn, gcn, gin} --log_dir checkpoints \
+                        --n_epochs 50 --batch_size 50
 ```
+
+Hyperparameter tuning:
+```shell
+python drug_gnn/hyperopt.py --data_path ${data} --task ${regression}  \
+                            --gnn_type dmpnn --n_epochs 30 \
+                            --hyperopt_dir hyper_dmpnn
+```
+
 ## Contact
 
 ## Misc
