@@ -81,8 +81,8 @@ class MolDataset(Dataset):
         super(MolDataset, self).__init__()
         
         self.smiles = smiles
-        dtype= torch.long if args.task.lower() == 'classification' else torch.float
-        self.labels = torch.tensor(labels, dtype= dtype)
+        self.dtype= torch.long if args.task.lower() == 'classification' else torch.float
+        self.labels = torch.tensor(labels, dtype=self.dtype)
         # self.data_map = {k: v for k, v in zip(range(len(self.smiles)), self.split)}
   
     def molgraph2data(self, molgraph: MolGraph, key):
@@ -90,7 +90,9 @@ class MolDataset(Dataset):
         data.x = torch.tensor(molgraph.f_atoms, dtype=torch.float)
         data.edge_index = torch.tensor(molgraph.edge_index, dtype=torch.long).t().contiguous()
         data.edge_attr = torch.tensor(molgraph.f_bonds, dtype=torch.float)
-        data.y = self.labels[key]
+        # Note: if y is scale, cast to 1d tensor
+        # if y is 1d tensor, cast to 2d tensor
+        data.y = self.labels[key].unsqueeze(0)
         data.smiles = self.smiles[key]
         return data
 
@@ -115,12 +117,7 @@ def construct_loader(args, modes=('train', 'val')):
     if isinstance(modes, str):
         modes = [modes]
 
-
-    # data_df = pd.read_pickle(args.data_path)
-    # smiles = data_df.index.to_list()
-    # labels = data_df.values.astype(np.float32)
-
-    # first column is SMILES, labels will be the rest columns.
+    # first column is SMILES, targets will be the rest columns.
     # multiclass classification are not supported yet !
     data_df = pd.read_csv(args.data_path)
     smiles = data_df.iloc[:, 0].values
@@ -141,7 +138,7 @@ def construct_loader(args, modes=('train', 'val')):
         with open(os.path.join(args.log_dir,"data.split.pkl"), 'wb') as out:
             pickle.dump(split, out)
 
-    # 
+    # infer output_size 
     if args.task.lower() == 'classification':
         args.output_size = len(np.unique(labels))
         labels = np.squeeze(labels).astype(int)
@@ -153,8 +150,8 @@ def construct_loader(args, modes=('train', 'val')):
     loaders = []
     for mode in modes:
         mode_idx = 0 if mode == 'train' else 1 if mode == 'val' else 2
-        smiles_subset = [smiles[i] for i in split[mode_idx] ]
-        labels_subset = [labels[i] for i in split[mode_idx] ]
+        smiles_subset = smiles[split[mode_idx]].tolist()
+        labels_subset = labels[split[mode_idx]].tolist() 
         dataset = MolDataset(smiles_subset, labels_subset, args)
         loader = DataLoader(dataset=dataset,
                             batch_size=args.batch_size,
