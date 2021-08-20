@@ -17,19 +17,17 @@ class GCNConv(MessagePassing):
 
         # no edge updates
         x = self.linear(x)
-
-        # Compute normalization
-        row, col = edge_index
-        deg = degree(col, x.size(0), dtype=x.dtype) + 1
-        deg_inv_sqrt = deg.pow(-0.5)
-        norm = deg_inv_sqrt[row] * deg_inv_sqrt[col]
-        x_new = self.propagate(edge_index, x=x, edge_attr=edge_attr, norm=norm)
-
+        x_new = self.propagate(edge_index, x=x, edge_attr=edge_attr, size=(x.size(0), x.size(0)))
         x = x_new + F.relu(x)
 
         return self.batch_norm(x)
 
-    def message(self, x_j, edge_attr, norm):
+    def message(self, x_j, size, edge_index, edge_attr):
+        # Compute normalization
+        row, col = edge_index
+        deg = degree(col, size[0], dtype=x_j.dtype) + 1
+        deg_inv_sqrt = deg.pow(-0.5)
+        norm = deg_inv_sqrt[row] * deg_inv_sqrt[col]
         return norm.view(-1, 1) * F.relu(x_j + edge_attr)
 
 
@@ -81,7 +79,6 @@ class DMPNNConv(MessagePassing):
         # if self.atom_messages:
         if not self.atom_messages:
             row, col = edge_index
-            # b2a, _ = edge_index
             ## filp -> Reverse the order of a n-D tensor along given axis in dims
             ## then reshape to (num_bonds, hidden)
             rev_message = edge_attr.view(edge_attr.size(0) // 2, 2, -1).flip(dims=[1]).view(edge_attr.size(0), -1)

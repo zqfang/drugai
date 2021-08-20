@@ -143,7 +143,7 @@ def construct_loader(args, modes=('train', 'val')):
                             batch_size=args.batch_size,
                             shuffle=not args.no_shuffle if mode == 'train' else False,
                             num_workers=args.num_workers,
-                            pin_memory=True,
+                            #pin_memory=True,
                             sampler=StereoSampler(dataset) if args.shuffle_pairs else None)
         loaders.append(loader)
 
