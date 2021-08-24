@@ -6,7 +6,7 @@
 *.c
 *.so
 *train
-*test
+*test*
 *checkpoint
 *data
 # tests
