@@ -1,12 +1,17 @@
-# Drug GNN
+# DrugAI
 Drug discovery using Graph Neural Network
 
 This is a `Pytorch Geometric` implementation of the paper [Chemprop](https://pubs.acs.org/doi/10.1021/acs.jcim.9b00237).
+
+Warning: The performance hasn't been evaluated !!! But it will
+
 
 Three GCNs are included:
 - [DMPNN](https://pubs.acs.org/doi/10.1021/acs.jcim.9b00237):
 - [GCN](https://arxiv.org/abs/1609.02907)
 - [GIN](https://arxiv.org/abs/1905.12265>), see also [GINEConv](https://pytorch-geometric.readthedocs.io/en/latest/_modules/torch_geometric/nn/conv/gin_conv.html)
+
+
 
 
 ## Dependency
