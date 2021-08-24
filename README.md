@@ -12,8 +12,6 @@ Three GCNs are included:
 - [GIN](https://arxiv.org/abs/1905.12265>), see also [GINEConv](https://pytorch-geometric.readthedocs.io/en/latest/_modules/torch_geometric/nn/conv/gin_conv.html)
 
 
-
-
 ## Dependency
 - numpy
 - pandas
