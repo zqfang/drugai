@@ -16,7 +16,7 @@ args = parse_train_args()
 torch.manual_seed(args.seed)
 logger = create_logger('train', args.log_dir)
 tb = SummaryWriter(log_dir = args.log_dir)
-train_loader, val_loader = construct_loader(args)
+train_loader, val_loader = construct_loader(args, ['train','val'])
 
 setattr(args, 'num_edge_features', train_loader.dataset.num_edge_features)
 setattr(args, 'num_node_features', train_loader.dataset.num_node_features)

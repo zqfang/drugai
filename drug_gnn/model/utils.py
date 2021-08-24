@@ -46,3 +46,51 @@ def get_loss_func(args: Namespace) -> nn.Module:
         return nn.MSELoss()
 
     raise ValueError(f'Dataset type "{args.task}" not supported.')
+
+
+class SaveLayerOutput:
+    """Helper function for saving layer input and output
+    """
+    def __init__(self):
+        self.outputs = []
+        self.inputs = []
+        
+    def __getitem__(self, idx):
+        if 0 <= idx < len(self.outputs):
+            return self.outputs[idx] 
+        
+    def __call__(self, module, module_in, module_out):
+        self.outputs.append(module_out)
+        self.inputs.append(module_in[0])
+    
+    def __len__(self):
+        return len(self.outputs)
+    
+    def clear(self):
+        self.outputs = []
+        
+    def module_output_to_numpy(self, tensor):
+        return tensor.detach().to('cpu').numpy()  
+
+
+class SaveLayerGrads:
+    """Helper function for save layer gradients
+    """
+    def __init__(self):
+        self.outputs = []
+        
+    def __getitem__(self, idx):
+        if 0 <= idx < len(self.outputs):
+            return self.outputs[idx] 
+        
+    def __call__(self, module, grad_in, grad_out):
+        self.outputs.append(grad_out)
+    
+    def __len__(self):
+        return len(self.outputs)
+    
+    def clear(self):
+        self.outputs = []
+        
+    def module_output_to_numpy(self, tensor):
+        return tensor.detach().to('cpu').numpy()  
