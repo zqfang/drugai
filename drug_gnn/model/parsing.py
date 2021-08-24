@@ -24,7 +24,7 @@ def add_train_args(parser: ArgumentParser):
                              'When `num_folds` > 1, the first fold uses this seed and all'
                              'subsequent folds add 1 to the seed.')
     # Training arguments
-    parser.add_argument('--n_epochs', type=int, default=60,
+    parser.add_argument('--n_epochs', type=int, default=30,
                         help='Number of epochs to run')
     parser.add_argument('--batch_size', type=int, default=50,
                         help='Batch size')
