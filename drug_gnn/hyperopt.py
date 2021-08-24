@@ -18,9 +18,9 @@ from model.parsing import add_train_args, modify_train_args
 
 def optimize(trial, args):
 
-    setattr(args, 'hidden_size', int(trial.suggest_discrete_uniform('hidden_size', 300, 1200, 300)))
+    setattr(args, 'hidden_size', int(trial.suggest_discrete_uniform('hidden_size', 300, 900, 300)))
     setattr(args, 'depth', int(trial.suggest_discrete_uniform('depth', 2, 5, 1)))
-    setattr(args, 'dropout', int(trial.suggest_discrete_uniform('dropout', 0, 0.6, 0.2)))
+    setattr(args, 'dropout', int(trial.suggest_discrete_uniform('dropout', 0.1, 0.5, 0.1)))# name, low, high, step
     setattr(args, 'lr', trial.suggest_loguniform('lr', 1e-5, 1e-3))
     setattr(args, 'batch_size', int(trial.suggest_categorical('batch_size', [25, 50, 100])))
     setattr(args, 'graph_pool', trial.suggest_categorical('graph_pool', ['sum', 'mean', 'max', 'attn', 'set2set']))
