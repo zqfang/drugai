@@ -50,7 +50,7 @@ for epoch in range(0, args.n_epochs):
         tb.add_scalar('Classification/train/acc', train_acc, epoch) 
     val_loss, val_acc = eval(model, val_loader, loss, args.device, args.task)
     logger.info(f"Epoch {epoch}: Validation Loss {val_loss}")
-    tb.add_scalar('Loss/train', val_loss, epoch) 
+    tb.add_scalar('Loss/val', val_loss, epoch) 
 
     if args.task == 'classification':
         logger.info(f"Epoch {epoch}: Validation Classification Accuracy {val_acc}")
