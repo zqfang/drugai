@@ -89,19 +89,27 @@ class GNN(nn.Module):
 
         # convolutions
         for l in range(self.depth):
-            h = self.convs[l](x_list[-1], edge_index, edge_attr_list[-1])
+            # last layer
+            if (self.gnn_type == 'dmpnn') and ( l == (self.depth -1)):
+                if self.atom_messages:
+                    h = self.aggr_nodes(x_list[-1], edge_index, edge_attr_list[-1], x0) # h: num_nodes X hidden_size
+                else:
+                    h = self.aggr_nodes(x_list[-1], edge_index, edge_attr_list[-1], x0) # h: num_edges X hidden_size
+            else: 
+                # previous layer
+                h = self.convs[l](x_list[-1], edge_index, edge_attr_list[-1])
+
             if (self.gnn_type == 'dmpnn') and (not self.atom_messages):
                 edge_attr_list.append(h)
             else:
                 x_list.append(h)
 
-
-        if self.gnn_type == 'dmpnn': 
-            if self.atom_messages:
-                h = self.aggr_nodes(h, edge_index, edge_attr_list[-1], x0) # h: num_nodes X hidden_size
-            else:
-                h = self.aggr_nodes(x_list[-1], edge_index, h, x0) # h: num_edges X hidden_size
-
+        # move above
+        # if self.gnn_type == 'dmpnn': 
+        #     if self.atom_messages:
+        #         h = self.aggr_nodes(h, edge_index, edge_attr_list[-1], x0) # h: num_nodes X hidden_size
+        #     else:
+        #         h = self.aggr_nodes(x_list[-1], edge_index, h, x0) # h: num_edges X hidden_size
 
         # batch => which assigns each node to a specific molecule
         # self.pool, aggreagate node to graph representatiotion
