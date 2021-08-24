@@ -25,8 +25,8 @@ class GNN(nn.Module):
                 self.node_init = nn.Linear(args.num_node_features, self.hidden_size)             
             else:
                 self.edge_init = nn.Linear(args.num_node_features + args.num_edge_features, self.hidden_size)
-                # last layer before ffn
-            self.aggr_nodes = DMPNNConv2(args) # atom center messages
+            # last layer before ffn
+            # self.aggr_nodes = DMPNNConv2(args) # atom center messages
         else:
             self.node_init = nn.Linear(args.num_node_features, self.hidden_size)
             self.edge_init = nn.Linear(args.num_edge_features, self.hidden_size)
@@ -34,13 +34,16 @@ class GNN(nn.Module):
         # layers
         self.convs = torch.nn.ModuleList()
 
-        for _ in range(self.depth):
+        for layer in range(self.depth):
             if self.gnn_type == 'gin':
                 self.convs.append(GINEConv(args))
             elif self.gnn_type == 'gcn':
                 self.convs.append(GCNConv(args))
             elif self.gnn_type == 'dmpnn':
-                self.convs.append(DMPNNConv(args))
+                if layer == (self.depth -1):
+                    self.convs.append(DMPNNConv2(args)) # atom center messages
+                else:
+                    self.convs.append(DMPNNConv(args)) # conv on edges
             else:
                 ValueError('Undefined GNN type called {}'.format(self.gnn_type))
         # graph pooling
@@ -92,9 +95,9 @@ class GNN(nn.Module):
             # last layer
             if (self.gnn_type == 'dmpnn') and ( l == (self.depth -1)):
                 if self.atom_messages:
-                    h = self.aggr_nodes(x_list[-1], edge_index, edge_attr_list[-1], x0) # h: num_nodes X hidden_size
+                    h = self.convs[l](x_list[-1], edge_index, edge_attr_list[-1], x0) # h: num_nodes X hidden_size
                 else:
-                    h = self.aggr_nodes(x_list[-1], edge_index, edge_attr_list[-1], x0) # h: num_edges X hidden_size
+                    h = self.convs[l](x_list[-1], edge_index, edge_attr_list[-1], x0) # h: num_edges X hidden_size
             else: 
                 # previous layer
                 h = self.convs[l](x_list[-1], edge_index, edge_attr_list[-1])
