@@ -73,10 +73,7 @@ class MolData(Data):
         return super().__inc__(key, value)
 
 
-
-
 class MolDataset(Dataset):
-
     def __init__(self, smiles: List, labels: List=None, args):
         super(MolDataset, self).__init__()
         
