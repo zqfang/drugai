@@ -22,7 +22,7 @@ Three GCN backends are used:
 
 ## Usage
 
-### input data Preprocessing
+### Input data
 
 Need at least one file
 1. a csv file with
@@ -33,24 +33,22 @@ Need at least one file
 
 ### 1. Train
 ```shell
-python drug_gnn/train.py --data_path ${data} --split_path ${split} \
+python drug_gnn/train.py --data_path ${data} \
                         --task ${regression} \
-                        --gnn_type dmpnn --log_dir checkpoints/dmpnn \
-                        --n_epochs 30 --batch_size 50
+                        --gnn_type dmpnn --log_dir checkpoints/dmpnn 
 ```
 
 ### 2. Predict
 ```shell
-python drug_gnn/predict.py --data_path ${data} --split_path ${split} \
+python drug_gnn/predict.py --data_path ${data} \
                         --task ${regression} \
-                        --gnn_type dmpnn --log_dir checkpoints/dmpnn \
-                        --n_epochs 50 --batch_size 50
+                        --gnn_type dmpnn --log_dir checkpoints/dmpnn 
 ```
 
 ### Hyperparameter tuning
 ```shell
 python drug_gnn/hyperopt.py --data_path ${data} --task ${regression}  \
-                            --gnn_type dmpnn --n_epochs 30 \
+                            --gnn_type dmpnn \
                             --hyperopt_dir hyper_dmpnn
 ```
 
