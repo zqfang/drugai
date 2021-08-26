@@ -12,11 +12,9 @@
     - crispr: xpr
     - misc:
 
-2. Gene Infer weights (landmark genes conversion matrix to 12032 genes) could be download from GEO:GSE92742
+2. Gene Infer weights (landmark genes conversion matrix to 11350 genes) could be download from GEO:GSE92743
 
-  - GSE92742_Broad_LINCS_auxiliary_datasets.tar.gz
-  - need to read LINC2017 cell paper to figure out how to use the weight matrix to do inference
-
+  - GSE92743_Broad_OLS_WEIGHTS_n979x11350.gctx
 
 3. repurposing_drugs from [here](https://clue.io/data/REP#REP)
 
