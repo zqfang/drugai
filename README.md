@@ -74,6 +74,12 @@ python drug_gnn/hyperopt.py --data_path ${data} --task ${regression}  \
 3. Efficacy Score:
     - 1. Prepare a up- or down-regulated gene signatures (Entrez ID only): up.txt, down.txt
     - 2. Get transform matrix: `GSE92743_Broad_OLS_WEIGHTS_n979x11350.gctx`
+        ```python
+           # convert to pandas DataFrame
+           from cmapPy.pandasGEXpress.parse import parse
+           weight = parse(self.weight_path).data_df
+           weight.to_csv("GSE92743_Broad_OLS_WEIGHTS_n979x11350.csv")
+        ```
     - 3. Predicted output from step 2
     - 4. Run:
     ```shell
@@ -89,10 +95,18 @@ python drug_gnn/hyperopt.py --data_path ${data} --task ${regression}  \
 Zhuoqing Fang: fangzq@stanford.edu
 
 ## Results
-Average pearson correlation (AUC-like plot) shows GNN works pretty good for predicting transcriptional profiles  
-
+1. Average pearson's correlation (AUC-like plot) shows GNN works pretty good for predicting transcriptional profiles  
 ![auc](notebook/assets/auc.png)
 
+
+2. TSNE plot of drug's embeddings 
+
+<img align="center" width="300" height="300" src="notebook/assets/tsne.png">
+
+
+3. Pearson's coefficiency distribution
+
+![dist](notebook/assets/pearson.png)
 
 ## Others
 

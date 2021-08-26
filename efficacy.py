@@ -1,9 +1,10 @@
 from argparse import ArgumentParser
 import pandas as pd
-from cmapPy.pandasGEXpress.parse import parse
 import numpy as np
 import sys, os
 from typing import List, Tuple, Dict, Union
+
+from pandas.core.arrays.base import ExtensionScalarOpsMixin
 
 def main(args):
     parser = ArgumentParser()
@@ -24,25 +25,22 @@ def main(args):
     scores.to_csv(args.output)
 
 class EfficacyPred:
-    def __init__(self, weight_path: str, up: List[str] = None, down: List[str] = None):
+    def __init__(self, weight: Union[str, pd.DataFrame], up: List[str] = None, down: List[str] = None):
         """
         Args:
 
         up:  entrz ids of up-regulated genes
         down: entrz ids of down-regulated genes
         preds: filepath to GNN predition output (978 landmark genes)
-        weight_path: filepath to DS_GEO_OLS_WEIGHTS_n979x21290.gctx
-        weight_meta: filepath to DS_GEO_OLS_WEIGHTS_n979x21290.gctx's metadata
-        
+        weight: filepath to GSE92743_Broad_OLS_WEIGHTS_n979x11350.gctx or a dataframe
         """
-        self.weight_path = weight_path
-        self.W, self.bias = self._get_weight() 
+        self.W, self.bias = self._get_weight(weight) 
         self.genes = self.W.index.append(self.W.columns[1:]).to_list() # 11350 + 979 = 12328 genes
 
         self.up = self._get_genes(up) if up else None
         self.down = self._get_genes(down) if down else None
 
-    def _get_weight(self):
+    def _get_weight(self, weight):
         """
         map 978 genes to 12328 genes
         Download the weight matrix from GSE92743. This file has correct Entrez id
@@ -56,12 +54,22 @@ class EfficacyPred:
         ## rows: 21,290 inferred features
         ## columns: 978 landmark genes + intercept = 979
         """
-        weight = parse(self.weight_path).data_df
-        # meta = pd.read_table(self.weight_meta, index_col=0, dtype=str)
-        # genes = meta.loc[weight.index]
-        # 21290 x 978, note: affy_id could without gene symbol
-        # non_entrze_mask = genes['pr_gene_symbol'].str.startswith("-")
-        W = weight.iloc[:, 1:] # 18815 X 978
+        if isinstance(weight, pd.DataFrame):
+            pass
+        elif isinstance(weight, str):
+            if weight.endswith("gctx"):
+                from cmapPy.pandasGEXpress.parse import parse
+                weight = parse(weight).data_df
+            elif weight.endswith("csv"):
+                weight = pd.read_csv(weight)
+            else:
+                weight = pd.read_table(weight)
+        else:
+            raise Exception("Unsupported file format")
+
+        assert weight.shape[1] == 978
+        # weights 
+        W = weights.iloc[:, 1:] # 18815 X 978
         bias = weight.iloc[:, 0] # intercept (987,)
         # FIXME: duplicated gene names, while affy_id is unique
         return W, bias
