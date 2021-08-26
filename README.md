@@ -3,10 +3,8 @@ Drug Efficacy Prediction using Graph Neural Network
 
 This is a `Pytorch Geometric` implementation of the paper [Chemprop](https://pubs.acs.org/doi/10.1021/acs.jcim.9b00237).
 
-Warning: The performance hasn't been evaluated !!! But it will
 
-
-Three GCNs are included:
+Three GCN backends are used:
 - [DMPNN](https://pubs.acs.org/doi/10.1021/acs.jcim.9b00237):
 - [GCN](https://arxiv.org/abs/1609.02907)
 - [GIN](https://arxiv.org/abs/1905.12265>), see also [GINEConv](https://pytorch-geometric.readthedocs.io/en/latest/_modules/torch_geometric/nn/conv/gin_conv.html)
@@ -64,11 +62,14 @@ python drug_gnn/hyperopt.py --data_path ${data} --task ${regression}  \
         - first column are SMILE strings
         - the rest columns are expression values
         - columns names should be Entrez IDs
-    - save best_model
+    - save `best_model`
 
-2. Prediction: two output file
-    -  Embeddings for each molecule: preds.embedding.npy
-    -  Predicted Landmark genes expression: preds.expression.csv
+2. Prediction step will generate two output file
+    -  Embeddings for each molecule: `molecule.embeddings.npy`
+    -  Predicted Landmark genes expression: `preds.expression.csv`
+
+
+
 
 3. Efficacy Score:
     - 1. Prepare a up- or down-regulated gene signatures (Entrez ID only): up.txt, down.txt
@@ -87,7 +88,10 @@ python drug_gnn/hyperopt.py --data_path ${data} --task ${regression}  \
 
 Zhuoqing Fang: fangzq@stanford.edu
 
-## Misc
+## Results
+Average pearson correlation (AUC-like plot) shows GNN works pretty good for predicting transcriptional profiles  
+
+![auc](notebook/assets/auc.png)
 
 
 ## Others

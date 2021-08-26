@@ -60,7 +60,7 @@ with torch.no_grad():
 
 logger.info("Save embeddings")
 embed = torch.cat(save_output.inputs, dim=0).cpu().numpy()
-np.save(os.path.join(args.log_dir, "preds.embedding.npy"), embed)
+np.save(os.path.join(args.log_dir, "molecule.embeddings.npy"), embed)
 
 # remove handle
 for h in hook_handles: h.remove()
