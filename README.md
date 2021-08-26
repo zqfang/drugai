@@ -90,9 +90,6 @@ python drug_gnn/hyperopt.py --data_path ${data} --task ${regression}  \
                        --output efficacy.csv
     ```
 
-## Contact
-
-Zhuoqing Fang: fangzq@stanford.edu
 
 ## Results
 1. Average pearson's correlation (AUC-like plot) shows GNN works pretty good for predicting transcriptional profiles  
@@ -107,6 +104,11 @@ Zhuoqing Fang: fangzq@stanford.edu
 3. Pearson's coefficiency distribution
 
 ![dist](notebook/assets/pearson.png)
+
+
+## Contact
+
+Zhuoqing Fang: fangzq@stanford.edu
 
 ## Others
 
