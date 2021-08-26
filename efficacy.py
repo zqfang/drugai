@@ -1,9 +1,27 @@
+from argparse import ArgumentParser
 import pandas as pd
 from cmapPy.pandasGEXpress.parse import parse
 import numpy as np
 import sys, os
 from typing import List, Tuple, Dict, Union
 
+def main(args):
+    parser = ArgumentParser()
+    parser.add_argument('--predicts',  type=str, required=True,
+                        help='predicted landmark genes expression file')
+    parser.add_argument('--weights', type=str, required=True
+                        help='Path to GSE92743_Broad_OLS_WEIGHTS_n979x11350.gctx')
+    parser.add_argument('--up', type=str, default=None,
+                        help='Path to up-regulated genes. One EntrezID per row')
+    parser.add_argument('--down', type=str, default=None,
+                        help='Path to up-regulated genes. One EntrezID per row')
+    parser.add_argument('--output', type=str, default="efficacy.csv",
+                        help='Path to output file')
+    
+    efficacy = EfficacyPred(args.weights, args.up, args.down)
+    scores = efficacy.compute_score(args.predicts)
+    scores.columns = ['ES']
+    scores.to_csv(args.output)
 
 class EfficacyPred:
     def __init__(self, weight_path: str, up: List[str] = None, down: List[str] = None):
@@ -101,7 +119,7 @@ class EfficacyPred:
         
         up: list of entrezids, or a txt file 
         down: list of entrzids, or a txt file
-        
+
         """
         exprs = self.get_conectivity(preds) # num_smiles x 978
         L12328_df = self.infer_expression(exprs) # 12328 x num_smiles 
@@ -173,10 +191,4 @@ class EfficacyPred:
 
 
 if __name__ == '__main__':
-    preds = sys.argv[1]
-    up = sys.argv[2]
-    down = sys.argv[3]
-    weight_path="CMAP_LINCS_2020/GSE92743/GSE92743_Broad_OLS_WEIGHTS_n979x11350.gctx"
-    efficacy = EfficacyPred(up, down, weight_path)
-    scores = efficacy.compute_score(preds)
-    scores.to_csv("efficacy.csv")
+    main()
