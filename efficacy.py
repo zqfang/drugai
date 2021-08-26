@@ -175,7 +175,7 @@ class EfficacyPred:
         Kolmogorov–Smirnov test
         '''
         if not isinstance(r1, pd.DataFrame):
-            raise Exception("r1 must be a pd.Seires")
+            raise Exception("r1 must be a pd.DataFrame")
         if len(q) == 0:
             ks = 0
         elif len(q) == 1:
