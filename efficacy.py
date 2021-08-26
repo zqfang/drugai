@@ -4,13 +4,12 @@ import numpy as np
 import sys, os
 from typing import List, Tuple, Dict, Union
 
-from pandas.core.arrays.base import ExtensionScalarOpsMixin
 
 def main(args):
     parser = ArgumentParser()
     parser.add_argument('--predicts',  type=str, required=True,
                         help='predicted landmark genes expression file')
-    parser.add_argument('--weights', type=str, required=True
+    parser.add_argument('--weights', type=str, required=True,
                         help='Path to GSE92743_Broad_OLS_WEIGHTS_n979x11350.gctx')
     parser.add_argument('--up', type=str, default=None,
                         help='Path to up-regulated genes. One EntrezID per row')
@@ -18,7 +17,7 @@ def main(args):
                         help='Path to up-regulated genes. One EntrezID per row')
     parser.add_argument('--output', type=str, default="efficacy.csv",
                         help='Path to output file')
-    
+    args = parser.parse_args()
     efficacy = EfficacyPred(args.weights, args.up, args.down)
     scores = efficacy.compute_score(args.predicts)
     scores.columns = ['ES']
@@ -172,6 +171,8 @@ class EfficacyPred:
         '''
         This function takes q, a list of gene names, and r1, a panda data
         frame as the input, and output the enrichment score vector
+
+        Kolmogorov–Smirnov test
         '''
         if not isinstance(r1, pd.DataFrame):
             raise Exception("r1 must be a pd.Seires")
