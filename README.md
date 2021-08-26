@@ -77,13 +77,13 @@ python drug_gnn/hyperopt.py --data_path ${data} --task ${regression}  \
         ```python
            # convert to pandas DataFrame
            from cmapPy.pandasGEXpress.parse import parse
-           weight = parse(self.weight_path).data_df
+           weight = parse('GSE92743_Broad_OLS_WEIGHTS_n979x11350.gctx').data_df
            weight.to_csv("GSE92743_Broad_OLS_WEIGHTS_n979x11350.csv")
         ```
     - 3. Predicted output from step 2
     - 4. Run:
     ```shell
-    python efficacy.py --weights GSE92743_Broad_OLS_WEIGHTS_n979x11350.gctx \
+    python efficacy.py --weights GSE92743_Broad_OLS_WEIGHTS_n979x11350.csv \
                        --predicts preds.expression.csv \
                        --up up.txt \
                        --down down.txt \
