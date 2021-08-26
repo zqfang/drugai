@@ -1,8 +1,0 @@
-[submodule "chemprop"]
-	path = chemprop
-	url = https://github.com/chemprop/chemprop
-[submodule "chiral_gnn"]
-	path = chiral_gnn
-	url = https://github.com/PattanaikL/chiral_gnn
-
-
