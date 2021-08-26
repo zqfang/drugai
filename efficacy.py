@@ -1,13 +1,120 @@
 import pandas as pd
-from cmapPy.pandasGEXpress import parse
+from cmapPy.pandasGEXpress.parse import parse
 import numpy as np
-import sys, os, ast
+import sys, os
 from typing import List, Tuple, Dict, Union
 
 
-class ConnectivityScore:
+class EfficacyPred:
+    def __init__(self, weight_path: str, up: List[str] = None, down: List[str] = None):
+        """
+        Args:
+
+        up:  entrz ids of up-regulated genes
+        down: entrz ids of down-regulated genes
+        preds: filepath to GNN predition output (978 landmark genes)
+        weight_path: filepath to DS_GEO_OLS_WEIGHTS_n979x21290.gctx
+        weight_meta: filepath to DS_GEO_OLS_WEIGHTS_n979x21290.gctx's metadata
+        
+        """
+        self.weight_path = weight_path
+        self.W, self.bias = self._get_weight() 
+        self.genes = self.W.index.append(self.W.columns[1:]).to_list() # 11350 + 979 = 12328 genes
+
+        self.up = self._get_genes(up) if up else None
+        self.down = self._get_genes(down) if down else None
+
+    def _get_weight(self):
+        """
+        map 978 genes to 12328 genes
+        Download the weight matrix from GSE92743. This file has correct Entrez id
+        GSE92743_Broad_OLS_WEIGHTS_n979x11350.gctx.gz
+        
+        ## Need to figure out what DS_GEO_OLS_WEIGHTS_n979x21290.gctx use for ?
+        ## This file are all affymatrix ids, not Entrez id !!!
+        ## DS_GEO_OLS_WEIGHTS_n979x21290.gctx: file found in GSE92742_Broad_LINCS_auxiliary_datasets.tar.gz	
+        ## The matrix of weights learned by training the L1000 inference algorithm, ordinary least squares (OLS) linear regression, on DSGEO.
+
+        ## rows: 21,290 inferred features
+        ## columns: 978 landmark genes + intercept = 979
+        """
+        weight = parse(self.weight_path).data_df
+        # meta = pd.read_table(self.weight_meta, index_col=0, dtype=str)
+        # genes = meta.loc[weight.index]
+        # 21290 x 978, note: affy_id could without gene symbol
+        # non_entrze_mask = genes['pr_gene_symbol'].str.startswith("-")
+        W = weight.iloc[:, 1:] # 18815 X 978
+        bias = weight.iloc[:, 0] # intercept (987,)
+        # FIXME: duplicated gene names, while affy_id is unique
+        return W, bias
+
+    def get_conectivity(self, preds: Union[str, pd.DataFrame]) -> pd.DataFrame:
+        """
+        The expression levels for 978 genes
+        """
+        if isinstance(preds, pd.DataFrame):
+            return preds
+        preds = pd.read_csv(preds, index_col=0) 
+        # index are SMILE strings
+        # column are entrz ids of landmark genes
+        # FIXME: landmark genes orders, better to dobule check !
+
+        return preds
+
+    def _get_genes(self, genes: Union[str, List[str]]) -> List[str]:
+        """get the gene signatures
+           one id per row, entrze id
+        """
+        if isinstance(genes, str):
+            up = pd.read_table(genes, header=None, comment="#")
+            ups= up.values.astype(str)
+            ups = list(np.squeeze(ups))
+        elif isinstance(genes, (list, tuple)):
+            ups = genes
+        else:
+            raise Exception("genes must be filepath, list or tuple")
+        # filter genes
+        ups_new = [str(i) for i in ups if str(i) in self.genes]
+
+        if len(ups_new) < 1: 
+            raise Exception("No genes found. Please input proper Entrez id")
+        return ups_new
+
+
+    def infer_expression(self, exprs: Union[str, pd.DataFrame]):
+        """compute the enrichment/efficacy score
+           exprs: shape (num_smiles, 978)
+        """
+        # get predicted 12328 genes' expression of compounds
+        # match the order of landmark genes
+        W = self.W.loc[:, exprs.columns] # 11350 x 978
+        L11350 = W.values @ exprs.T.values  + self.bias.values.reshape(-1,1) # linear transform, infer 11350 genes
+        L11350_df = pd.DataFrame(L11350, index=W.index, columns=exprs.index) 
+        L12328_df = pd.concat([exprs.T, L11350_df]) # note, columns aligned by index automatically
+        return L12328_df
+
+    def compute_score(self, preds: Union[str, pd.DataFrame], up: List[str] = None, down: List[str]=None) -> pd.DataFrame:
+        """
+        preds: (num_smiles x 978) prediction output from GNN model
+               row index: SMILE Strings
+               column index: Entrez IDs
+        
+        up: list of entrezids, or a txt file 
+        down: list of entrzids, or a txt file
+        
+        """
+        exprs = self.get_conectivity(preds) # num_smiles x 978
+        L12328_df = self.infer_expression(exprs) # 12328 x num_smiles 
+        # handle genes
+        up = self._get_genes(up) if up else self.up 
+        down = self._get_genes(down) if down else self.down
+        # compute score
+        cs = self._connectivity_socre(up, down, expression=L12328_df)
+        return cs
+
+
     # This file consists of useful functions that are related to cmap
-    def __call__(self, qup: List[str], qdown: List[str], expression: pd.DataFrame):
+    def _connectivity_socre(self, qup: List[str], qdown: List[str], expression: pd.DataFrame):
         '''
         This function takes qup & qdown, which are lists of gene
         names, and  expression, a panda data frame of the expressions
@@ -65,102 +172,11 @@ class ConnectivityScore:
         return ks
 
 
-class EfficacyPred:
-    def __init__(self, up: List[str], down: List[str], weight_path: str, weight_meta: str):
-        """
-        Args:
-
-        up:  entrz ids of up-regulated genes
-        down: entrz ids of down-regulated genes
-        preds: filepath to GNN predition output (978 landmark genes)
-        weight_path: filepath to DS_GEO_OLS_WEIGHTS_n979x21290.gctx
-        weight_meta: filepath to DS_GEO_OLS_WEIGHTS_n979x21290.gctx's metadata
-        
-        """
-        self.weight_path = weight_path
-        self.weight_meta = weight_meta
-        self.W, self.bias, self.genes = self._get_weight()
-        self.affy2entrz = 
-        if not isinstance(up, list):
-            up = self._get_genes(up)
-        if not isinstance(down, list):
-            down = self._get_genes(down)
-        # drop genes not in gene list
-        self.up = [str(u) for u in up if str(u) in list(self.genes["pr_gene_id"])] 
-        self.down = [str(d) for d in down if str(d) in list(self.genes["pr_gene_id"])]
-        self._cs = ConnectivityScore()
-
-    def _get_weight(self):
-        """
-        map 978 genes to 12328 genes
-
-        DS_GEO_OLS_WEIGHTS_n979x21290.gctx	
-        The matrix of weights learned by training the L1000 inference algorithm, ordinary least squares (OLS) linear regression, on DSGEO.
-
-        rows: 21,290 inferred features
-        columns: 978 landmark genes + intercept = 979
-
-        file found in: GSE92742_Broad_LINCS_auxiliary_datasets.tar.gz
-        """
-        weight = parse(self.weight_path).data_df
-        meta = pd.read_table(self.weight_meta, index_col=0, dtype=str)
-        genes = meta.loc[weight.index]
-        # 21290 x 978, note: affy_id could without gene symbol
-        non_entrze_mask = genes['pr_gene_symbol'].str.startswith("-")
-        W = weight.iloc[~non_entrze_mask, 1:] # 18815 X 978
-        bias = weight.iloc[~non_entrze_mask, 0] # intercept (987,)
-        # FIXME: duplicated gene names, while affy_id is unique
-        return W, bias, genes
-
-    def _get_conectivity(self, preds):
-        """
-        The expression levels for 978 genes
-        """
-        tmp = pd.read_csv(preds)['prediction'].apply(lambda x: ast.literal_eval(x)).to_list()
-        preds = pd.DataFrame(tmp)
-        # FIXME
-        #self.smiles = 
-        # A = 
-        return preds
-
-
-    def _get_genes(self, fl_name):
-        """get the gene signatures
-           one id per row, entrze id
-        """
-        up = pd.read_table(fl_name, header=None)
-        ups= up.values.astype(int)
-        print(ups.shape)
-        ups = list(np.squeeze(ups))
-        ups_new = [i for i in ups if i in list(self.genes["pr_gene_id"])]
-        return ups_new
-
-
-    def compute_cs(self, exprs: Union[str, pd.DataFrame]):
-        """compute the enrichment score"""
-        if not isinstance(exprs, pd.DataFrame):
-            exprs = self._get_conectivity(exprs)
-    
-        # get predicted 12328 genes' expression of compounds
-        # FIXME: match landmark genes
-        self.exprs = self.W.values @ exprs.T.values  + self.bias.values.reshape(-1,1) # L12K
-        # (genes, rows)
-        L12k_df = pd.DataFrame(self.exprs, index=self.genes["pr_gene_id"], columns=exprs.index) 
-        # FIXME: average genes
-        L12k_df = L12k_df.groupby(level=0).mean() # 11806 x 978
-        cs = self._cs(self.up, self.down, L12k_df)
-        cs.columns = ['efficacy']
-        self.efficacy_scores = cs
-        return cs
-
-
 if __name__ == '__main__':
     preds = sys.argv[1]
     up = sys.argv[2]
     down = sys.argv[3]
-
-    weight_meta="CMAP_LINCS_2020/GSE92742_Broad_LINCS_auxiliary_datasets/Affymetrix_row_meta.txt",
-    weight_path="CMAP_LINCS_2020/GSE92742_Broad_LINCS_auxiliary_datasets/DS_GEO_OLS_WEIGHTS_n979x21290.gctx"
-    efficacy = EfficacyPred(up, down, weight_path, weight_meta)
-    scores = efficacy.compute_cs(preds)
+    weight_path="CMAP_LINCS_2020/GSE92743/GSE92743_Broad_OLS_WEIGHTS_n979x11350.gctx"
+    efficacy = EfficacyPred(up, down, weight_path)
+    scores = efficacy.compute_score(preds)
     scores.to_csv("efficacy.csv")

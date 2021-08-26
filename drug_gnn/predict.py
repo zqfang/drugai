@@ -15,18 +15,17 @@ from model.parsing import parse_train_args
 from model.data import MolDataset
 from torch_geometric.data import DataLoader
 
-
+global args
 args = parse_train_args()
 torch.manual_seed(args.seed)
-logger = create_logger('eval', args.log_dir)
+logger = create_logger('predict', args.log_dir)
 loss = get_loss_func(args)
 
 # read data in
 data_df = pd.read_csv(args.data_path)
 smiles = data_df.iloc[:, 0].values
 # construct dataloaders
-loaders = []
-dataset = MolDataset(smiles, None, args)
+dataset = MolDataset(args, smiles, None)
 test_loader = DataLoader(dataset=dataset,batch_size=args.batch_size,
                     shuffle=False,num_workers=args.num_workers,
                     pin_memory=True,sampler=None)
@@ -38,8 +37,8 @@ setattr(args, 'num_node_features', test_loader.dataset.num_node_features)
 
 # load best model
 model = GNN(args).to(args.device)
-state_dict = torch.load(os.path.join(args.log_dir, 'best_model'), map_location=args.device)
-model.load_state_dict(state_dict)
+checkpoints = torch.load(os.path.join(args.log_dir, 'best_model'), map_location=args.device)
+model.load_state_dict(checkpoints['state_dict'])
 
 
 ## hook
@@ -68,8 +67,10 @@ for h in hook_handles: h.remove()
 
 # save predictions
 smiles = test_loader.dataset.smiles
-preds_path = os.path.join(args.log_dir, 'preds.csv')
-pd.DataFrame(list(zip(smiles, preds)), columns=['smiles', 'prediction']).to_csv(preds_path, index=False)
+logger.info("Save predicted expressions")
+preds_path = os.path.join(args.log_dir, 'preds.expression.csv')
+## FIXME: columns should match to your trained model
+pd.DataFrame(preds, index=smiles, columns=checkpoints['targets']).to_csv(preds_path)
 logger.info('Done')
 
 

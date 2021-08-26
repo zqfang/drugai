@@ -7,7 +7,7 @@
 *.so
 *train
 *test*
-*checkpoint
+*checkpoints*
 *data
 # tests
 *.ipynb

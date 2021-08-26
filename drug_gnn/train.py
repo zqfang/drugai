@@ -20,6 +20,7 @@ train_loader, val_loader = construct_loader(args, ['train','val'])
 
 setattr(args, 'num_edge_features', train_loader.dataset.num_edge_features)
 setattr(args, 'num_node_features', train_loader.dataset.num_node_features)
+setattr(args, 'targets', train_loader.dataset.targets)
 # create model, optimizer, scheduler, and loss fn
 model = GNN(args).to(args.device)
 optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
@@ -59,14 +60,16 @@ for epoch in range(0, args.n_epochs):
     if val_loss <= best_val_loss:
         best_val_loss = val_loss
         best_epoch = epoch
-        torch.save(model.state_dict(), os.path.join(args.log_dir, 'best_model'))
+        torch.save({'state_dict': model.state_dict(),
+                    'targets': args.targets}, 
+                    os.path.join(args.log_dir, 'best_model'))
 
-logger.info(f"Best Validation Loss {best_val_loss} on Epoch {best_epoch}")
+# logger.info(f"Best Validation Loss {best_val_loss} on Epoch {best_epoch}")
 
 # load best model
 model = GNN(args).to(args.device)
-state_dict = torch.load(os.path.join(args.log_dir, 'best_model'), map_location=args.device)
-model.load_state_dict(state_dict)
+checkpoints = torch.load(os.path.join(args.log_dir, 'best_model'), map_location=args.device)
+model.load_state_dict(checkpoints['state_dict'])
 
 # predict test data
 test_loader = construct_loader(args, modes='test')
@@ -78,6 +81,10 @@ if args.task == 'classification':
 
 # save predictions
 smiles = test_loader.dataset.smiles
-preds_path = os.path.join(args.log_dir, 'preds.csv')
-pd.DataFrame(list(zip(smiles, preds)), columns=['smiles', 'prediction']).to_csv(preds_path, index=False)
+# save predictions
+smiles = test_loader.dataset.smiles
+logger.info("Save testset predicted expressions")
+preds_path = os.path.join(args.log_dir, 'test.preds.expression.csv')
+pd.DataFrame(preds, index=smiles, columns=args.targets).to_csv(preds_path)
+logger.info('Done')
 tb.close()

@@ -74,10 +74,11 @@ class MolData(Data):
 
 
 class MolDataset(Dataset):
-    def __init__(self, smiles: List, labels: List=None, args):
+    def __init__(self, args, smiles: List, labels: List=None):
         super(MolDataset, self).__init__()
         
         self.smiles = smiles
+        # self.columns = args.columns
         self.dtype= torch.long if args.task.lower() == 'classification' else torch.float
         if labels is not None:
             self.labels = torch.tensor(labels, dtype=self.dtype)
@@ -96,7 +97,7 @@ class MolDataset(Dataset):
         return data
 
     def __len__(self):
-        return len(self.labels)
+        return len(self.smiles)
 
     def __getitem__(self, key):
         ## FIXME: only one each time, slice ?
@@ -121,7 +122,8 @@ def construct_loader(args, modes=('train', 'val','test', 'all')):
     data_df = pd.read_csv(args.data_path)
     smiles = data_df.iloc[:, 0].values
     labels = data_df.iloc[:, 1:].values
-
+    # save column entrez ids for later use
+    targets = data_df.columns[1:].to_list()
      # read train, val, test split, or create one and save to log_dir
     if args.split_path:
         with open(args.split_path, 'rb') as handle:
@@ -156,7 +158,8 @@ def construct_loader(args, modes=('train', 'val','test', 'all')):
             subset = list(range(len(labels)))
         smiles_subset = smiles[subset].tolist()
         labels_subset = labels[subset].tolist() 
-        dataset = MolDataset(smiles_subset, labels_subset, args)
+        dataset = MolDataset(args, smiles_subset, labels_subset)
+        dataset.targets = targets
         loader = DataLoader(dataset=dataset,
                             batch_size=args.batch_size,
                             shuffle=not args.no_shuffle if mode == 'train' else False,
