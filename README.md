@@ -1,11 +1,12 @@
 # DrugAI
-Drug Efficacy Prediction using Graph Neural Network
+### Drug Efficacy Prediction using Graph Neural Network
 
-This is a `Pytorch Geometric` implementation of the paper [Chemprop](https://pubs.acs.org/doi/10.1021/acs.jcim.9b00237).
+![GNN](notebook/assets/gnn_landmark.jpg)
 
 
-Three GCN backends are used:
-- [DMPNN](https://pubs.acs.org/doi/10.1021/acs.jcim.9b00237):
+
+We implemented 3 GCN model for efficacy prediction:
+- [DMPNN](https://pubs.acs.org/doi/10.1021/acs.jcim.9b00237)
 - [GCN](https://arxiv.org/abs/1609.02907)
 - [GIN](https://arxiv.org/abs/1905.12265>), see also [GINEConv](https://pytorch-geometric.readthedocs.io/en/latest/_modules/torch_geometric/nn/conv/gin_conv.html)
 
