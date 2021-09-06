@@ -5,7 +5,7 @@ import sys, os
 from typing import List, Tuple, Dict, Union
 
 
-def main(args):
+def main():
     parser = ArgumentParser()
     parser.add_argument('--predicts',  type=str, required=True,
                         help='predicted landmark genes expression file')
@@ -66,9 +66,9 @@ class EfficacyPred:
         else:
             raise Exception("Unsupported file format")
 
-        assert weight.shape[1] == 978
+        assert weight.shape[1] == 979 # first column is offset
         # weights 
-        W = weights.iloc[:, 1:] # 18815 X 978
+        W = weight.iloc[:, 1:] # 18815 X 978
         bias = weight.iloc[:, 0] # intercept (987,)
         # FIXME: duplicated gene names, while affy_id is unique
         return W, bias
