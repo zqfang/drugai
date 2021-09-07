@@ -7,6 +7,7 @@ import os
 import torch
 import numpy as np
 import pandas as pd
+from pathlib import Path
 from tqdm.auto import tqdm
 from model.utils import create_logger, get_loss_func, SaveLayerOutput
 
@@ -14,6 +15,7 @@ from model.gnn import GNN
 from model.parsing import parse_train_args
 from model.data import MolDataset
 from torch_geometric.data import DataLoader
+from rdkit import Chem
 
 global args
 args = parse_train_args()
@@ -23,7 +25,9 @@ loss = get_loss_func(args)
 
 # read data in
 data_df = pd.read_csv(args.data_path)
-smiles = data_df.iloc[:, 0].values
+mask = data_df.iloc[:, 0].apply(lambda x: True if Chem.MolFromSmiles(x) else False) # valid smiles
+smiles = data_df.iloc[:, 0][mask].values
+logger.info(f"Parseble compound num: {len(smiles)}")
 # construct dataloaders
 dataset = MolDataset(args, smiles, None)
 test_loader = DataLoader(dataset=dataset,batch_size=args.batch_size,
@@ -60,15 +64,17 @@ with torch.no_grad():
 
 logger.info("Save embeddings")
 embed = torch.cat(save_output.inputs, dim=0).cpu().numpy()
-np.save(os.path.join(args.log_dir, "molecule.embeddings.npy"), embed)
 
 # remove handle
 for h in hook_handles: h.remove()
+## outputs
+output_prefix = Path(args.data_path).stem
+np.save(os.path.join(args.log_dir, f"{output_prefix}.embeddings.npy"), embed)
 
 # save predictions
 smiles = test_loader.dataset.smiles
 logger.info("Save predicted expressions")
-preds_path = os.path.join(args.log_dir, 'preds.expression.csv')
+preds_path = os.path.join(args.log_dir, f"{output_prefix}.preds.expression.csv")
 ## FIXME: columns should match to your trained model
 pd.DataFrame(preds, index=smiles, columns=checkpoints['targets']).to_csv(preds_path)
 logger.info('Done')

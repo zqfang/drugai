@@ -1,4 +1,5 @@
 from argparse import ArgumentParser
+from pathlib import Path
 import pandas as pd
 import numpy as np
 import sys, os
@@ -15,13 +16,26 @@ def main():
                         help='Path to up-regulated genes. One EntrezID per row')
     parser.add_argument('--down', type=str, default=None,
                         help='Path to up-regulated genes. One EntrezID per row')
-    parser.add_argument('--output', type=str, default="efficacy.csv",
+    parser.add_argument('--output', type=str, default=None,
                         help='Path to output file')
     args = parser.parse_args()
+    outfile = Path(args.predicts).stem + ".efficacy.csv"
+    if args.output is not None: outfile = args.output
+    
+
     efficacy = EfficacyPred(args.weights, args.up, args.down)
-    scores = efficacy.compute_score(args.predicts)
-    scores.columns = ['ES']
-    scores.to_csv(args.output)
+    preds = pd.read_csv(args.predicts, index_col=0) 
+    efficacy_socres = []
+    output = open(outfile, 'a')
+    for i in range(0, len(preds), 2000):
+        scores = efficacy.compute_score(preds.iloc[i:i+2000])
+        #scores.columns = ['ES']
+        scores.to_csv(output, mode='a', header=False)
+        efficacy_socres.append(scores)
+    ## 
+    #efficacy_socres = pd.concat(efficacy_socres)
+    #efficacy_socres.to_csv(args.output)
+    output.close()
 
 class EfficacyPred:
     def __init__(self, weight: Union[str, pd.DataFrame], up: List[str] = None, down: List[str] = None):
@@ -134,12 +148,12 @@ class EfficacyPred:
         up = self._get_genes(up) if up else self.up 
         down = self._get_genes(down) if down else self.down
         # compute score
-        cs = self._connectivity_socre(up, down, expression=L12328_df)
+        cs = self._connectivity_score(up, down, expression=L12328_df)
         return cs
 
 
     # This file consists of useful functions that are related to cmap
-    def _connectivity_socre(self, qup: List[str], qdown: List[str], expression: pd.DataFrame):
+    def _connectivity_score(self, qup: List[str], qdown: List[str], expression: pd.DataFrame):
         '''
         This function takes qup & qdown, which are lists of gene
         names, and  expression, a panda data frame of the expressions
@@ -157,7 +171,7 @@ class EfficacyPred:
                     w.append(esup[i]-esdown[i])
                 else:
                     w.append(0)
-            return pd.DataFrame(w, expression.columns)
+            return pd.DataFrame({'es': w, 'esup': esup, 'esdown':esdown}, expression.columns)
         elif qup and qdown==None:
             esup = self.enrichment_score(qup, ranks)
             return pd.DataFrame(esup, expression.columns)
