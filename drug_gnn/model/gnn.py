@@ -116,6 +116,6 @@ class GNN(nn.Module):
 
         # batch => which assigns each node to a specific molecule
         # self.pool, aggreagate node to graph representatiotion
-        return self.ffn(self.pool(h, batch)).squeeze(-1)
+        return torch.clamp(self.ffn(self.pool(h, batch)).squeeze(-1), min=0) # expresssion value must >=0
 
 

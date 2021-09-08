@@ -81,8 +81,8 @@ if args.task == 'classification':
 
 # save predictions
 smiles = test_loader.dataset.smiles
-logger.info("Save testset predicted expressions")
-preds_path = os.path.join(args.log_dir, 'test.preds.expression.csv')
+logger.info("Save test set predicted expressions")
+preds_path = os.path.join(args.log_dir, 'test.pred.exprs.csv')
 pd.DataFrame(preds, index=smiles, columns=args.targets).to_csv(preds_path)
 logger.info('Done')
 tb.close()

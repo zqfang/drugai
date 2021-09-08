@@ -1,7 +1,7 @@
 # DrugAI
 
 
-## Data Download
+## LINCS2020 Download
 
 1. Data are download from [LINCS2020](https://clue.io/data/CMap2020#LINCS2020).
 

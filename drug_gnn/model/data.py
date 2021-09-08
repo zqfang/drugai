@@ -115,8 +115,8 @@ class MolDataset(Dataset):
 def construct_loader(args, modes=('train', 'val','test', 'all')):
 
     if isinstance(modes, str):
-        modes = [modes]
         assert modes in ('train', 'val','test', 'all')
+        modes = [modes]
     # first column is SMILES, targets will be the rest columns.
     # multiclass classification are not supported yet !
     data_df = pd.read_csv(args.data_path)

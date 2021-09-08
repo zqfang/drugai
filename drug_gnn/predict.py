@@ -25,8 +25,9 @@ loss = get_loss_func(args)
 
 # read data in
 data_df = pd.read_csv(args.data_path)
-mask = data_df.iloc[:, 0].apply(lambda x: True if Chem.MolFromSmiles(x) else False) # valid smiles
-smiles = data_df.iloc[:, 0][mask].values
+#mask = data_df.loc[:, 'SMILES'].apply(lambda x: True if Chem.MolFromSmiles(x.strip(" ")) else False) # valid smiles
+# smiles = data_df.loc[:, 'SMILES'][mask].values
+smiles = data_df.loc[:, 'SMILES'].values
 logger.info(f"Parseble compound num: {len(smiles)}")
 # construct dataloaders
 dataset = MolDataset(args, smiles, None)
@@ -74,7 +75,7 @@ np.save(os.path.join(args.log_dir, f"{output_prefix}.embeddings.npy"), embed)
 # save predictions
 smiles = test_loader.dataset.smiles
 logger.info("Save predicted expressions")
-preds_path = os.path.join(args.log_dir, f"{output_prefix}.preds.expression.csv")
+preds_path = os.path.join(args.log_dir, f"{output_prefix}.pred.exprs.csv")
 ## FIXME: columns should match to your trained model
 pd.DataFrame(preds, index=smiles, columns=checkpoints['targets']).to_csv(preds_path)
 logger.info('Done')

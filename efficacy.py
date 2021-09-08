@@ -22,13 +22,16 @@ def main():
     outfile = Path(args.predicts).stem + ".efficacy.csv"
     if args.output is not None: outfile = args.output
     
-
     efficacy = EfficacyPred(args.weights, args.up, args.down)
     preds = pd.read_csv(args.predicts, index_col=0) 
     efficacy_socres = []
+    # overwrite outputfile
+    if os.path.exists(outfile): os.remove(outfile)
+    # append mode
     output = open(outfile, 'a')
-    for i in range(0, len(preds), 2000):
-        scores = efficacy.compute_score(preds.iloc[i:i+2000])
+    step = 5000
+    for i in range(0, len(preds), step):
+        scores = efficacy.compute_score(preds.iloc[i:i+step])
         #scores.columns = ['ES']
         scores.to_csv(output, mode='a', header=False)
         efficacy_socres.append(scores)
@@ -47,7 +50,7 @@ class EfficacyPred:
         preds: filepath to GNN predition output (978 landmark genes)
         weight: filepath to GSE92743_Broad_OLS_WEIGHTS_n979x11350.gctx or a dataframe
         """
-        self.W, self.bias = self._get_weight(weight) 
+        self.W = self._get_weight(weight) 
         self.genes = self.W.index.append(self.W.columns[1:]).to_list() # 11350 + 979 = 12328 genes
 
         self.up = self._get_genes(up) if up else None
@@ -82,10 +85,10 @@ class EfficacyPred:
 
         assert weight.shape[1] == 979 # first column is offset
         # weights 
-        W = weight.iloc[:, 1:] # 18815 X 978
-        bias = weight.iloc[:, 0] # intercept (987,)
-        # FIXME: duplicated gene names, while affy_id is unique
-        return W, bias
+        #W = weight.iloc[:, 1:] # 18815 X 978
+        #bias = weight.iloc[:, 0] # W_0 (978,) 
+        
+        return weight
 
     def get_conectivity(self, preds: Union[str, pd.DataFrame]) -> pd.DataFrame:
         """
@@ -105,7 +108,7 @@ class EfficacyPred:
            one id per row, entrze id
         """
         if isinstance(genes, str):
-            up = pd.read_table(genes, header=None, comment="#")
+            up = pd.read_table(genes, header=None, comment="#", dtype=str)
             ups= up.values.astype(str)
             ups = list(np.squeeze(ups))
         elif isinstance(genes, (list, tuple)):
@@ -120,16 +123,21 @@ class EfficacyPred:
         return ups_new
 
 
-    def infer_expression(self, exprs: Union[str, pd.DataFrame]):
+    def infer_expression(self, landmarks: Union[str, pd.DataFrame]):
         """compute the enrichment/efficacy score
            exprs: shape (num_smiles, 978)
         """
+        # insert offset (bias)
+        exprs = landmarks.copy()
+        exprs.insert(loc=0, column="OFFSET", value=1) # inplace insert
         # get predicted 12328 genes' expression of compounds
         # match the order of landmark genes
-        W = self.W.loc[:, exprs.columns] # 11350 x 978
-        L11350 = W.values @ exprs.T.values  + self.bias.values.reshape(-1,1) # linear transform, infer 11350 genes
-        L11350_df = pd.DataFrame(L11350, index=W.index, columns=exprs.index) 
-        L12328_df = pd.concat([exprs.T, L11350_df]) # note, columns aligned by index automatically
+        W = self.W.loc[:, exprs.columns] # 11350 x 979
+        # [D x S] = [D x L+1] * [L+1 x S]
+        L11350 = W @ exprs.T # linear transform, infer 11350 genes
+        # non-negative !
+        L11350.clip(lower=0, inplace=True)
+        L12328_df = pd.concat([landmarks.T, L11350]) # note, columns aligned by index automatically
         return L12328_df
 
     def compute_score(self, preds: Union[str, pd.DataFrame], up: List[str] = None, down: List[str]=None) -> pd.DataFrame:
@@ -147,6 +155,10 @@ class EfficacyPred:
         # handle genes
         up = self._get_genes(up) if up else self.up 
         down = self._get_genes(down) if down else self.down
+        print(f"up genes: {len(up)}; down genes: {len(down)}")
+        # FIXME: it looks like the z-socre,normalize,... are very critical for the es score representation
+        # do more trick here to test best method
+        L12328_df = L12328_df - L12328_df.mean(axis=1).values.reshape((-1,1))
         # compute score
         cs = self._connectivity_score(up, down, expression=L12328_df)
         return cs
@@ -162,9 +174,10 @@ class EfficacyPred:
         # This function takes a panda data frame of gene names and expressions
         # as an input, and output a data frame of gene names and ranks
         ranks = expression.rank(ascending=False, method="first")
+        #ranks = 10000*ranks / ranks.shape[0]
         if qup and qdown:
-            esup = self.enrichment_score(qup, ranks)
-            esdown = self.enrichment_score(qdown, ranks)
+            esup = self.ks_score(qup, ranks)
+            esdown = self.ks_score(qdown, ranks)
             w = []
             for i in range(len(esup)):
                 if esup[i]*esdown[i] <= 0:
@@ -173,15 +186,15 @@ class EfficacyPred:
                     w.append(0)
             return pd.DataFrame({'es': w, 'esup': esup, 'esdown':esdown}, expression.columns)
         elif qup and qdown==None:
-            esup = self.enrichment_score(qup, ranks)
+            esup = self.ks_score(qup, ranks)
             return pd.DataFrame(esup, expression.columns)
         elif qup == None and qdown:
-            esdown = self.enrichment_score(qdown, ranks)
+            esdown = self.ks_score(qdown, ranks)
             return pd.DataFrame(esdown, expression.columns)
         else:
             return None
 
-    def enrichment_score(self, q: List[str], r1: pd.DataFrame):
+    def ks_score(self, q: List[str], r1: pd.DataFrame):
         '''
         This function takes q, a list of gene names, and r1, a panda data
         frame as the input, and output the enrichment score vector
@@ -198,7 +211,7 @@ class EfficacyPred:
             ks = ks.T
         else:
             n = r1.shape[0]
-            sub = r1.loc[q,:]
+            sub = r1.loc[q,:] # genes X samples
             J = sub.rank()
             a_vect = J/len(q)-sub/n
             b_vect = (sub-1)/n-(J-1)/len(q)
@@ -211,6 +224,58 @@ class EfficacyPred:
                 else:
                     ks.append(-b[i])
         return ks
+
+    def gsea_score(self, expression: pd.DataFrame, gene_set, weighted_score_type=1, single=False):
+        """This is the most important function of GSEApy. It has the same algorithm with GSEA and ssGSEA.
+        :param gene_set: up and down gene list (concated)
+        :param weighted_score_type:  It's the same with gsea's weighted_score method. Weighting by the correlation
+                                is a very reasonable choice that allows significant gene sets with less than perfect coherence.
+                                options: 0(classic),1,1.5,2. default:1. if one is interested in penalizing sets for lack of
+                                coherence or to discover sets with any type of nonrandom distribution of tags, a value p < 1
+                                might be appropriate. On the other hand, if one uses sets with large number of genes and only
+                                a small subset of those is expected to be coherent, then one could consider using p > 1.
+                                Our recommendation is to use p = 1 and use other settings only if you are very experienced
+                                with the method and its behavior.
+        :return:
+        ES: Enrichment score (real number between -1 and +1)
+        """
+        N = len(expression)
+        gene_list = expression.index.values
+        # Test whether each element of a 1-D array is also present in a second array
+        # It's more intuitive here than original enrichment_score source code.
+        # use .astype to covert bool to integer
+        tag_indicator = np.in1d(gene_list, gene_set, assume_unique=True).astype(int)  # notice that the sign is 0 (no tag) or 1 (tag)
+        correl_mat = expression.values
+        if weighted_score_type == 0 :
+            correl_mat = np.ones((expression.shape))
+        else:
+            correl_mat = np.abs(correl_mat)**weighted_score_type
+
+        # get indices of tag_indicator
+        hit_ind = np.flatnonzero(tag_indicator).tolist()
+        # set axis to 1, because we have 2D array
+        axis = 1
+        tag_indicator = np.tile(tag_indicator, (expression.shape[0],1))
+
+        Nhint = tag_indicator.sum(axis=axis, keepdims=True)
+        sum_correl_tag = np.sum(correl_mat*tag_indicator, axis=axis, keepdims=True)
+        # compute ES score, the code below is identical to gsea enrichment_score method.
+        no_tag_indicator = 1 - tag_indicator
+        Nmiss =  N - Nhint
+        norm_tag =  1.0/sum_correl_tag
+        norm_no_tag = 1.0/Nmiss
+
+        RES = np.cumsum(tag_indicator * correl_mat * norm_tag - no_tag_indicator * norm_no_tag, axis=axis)
+
+        if single:
+            es_vec = RES.sum(axis=axis)
+        else:
+            max_ES, min_ES =  RES.max(axis=axis), RES.min(axis=axis)
+            es_vec = np.where(np.abs(max_ES) > np.abs(min_ES), max_ES, min_ES)
+        # extract values
+        es, esnull, RES = es_vec[-1], es_vec[:-1], RES[-1,:]
+
+        return es, esnull, hit_ind, RES
 
 
 if __name__ == '__main__':

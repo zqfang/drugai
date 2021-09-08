@@ -64,10 +64,8 @@ python drug_gnn/hyperopt.py --data_path ${data} --task ${regression}  \
     - save `best_model`
 
 2. Prediction step will generate two output file
-    -  Embeddings for each molecule: `molecule.embeddings.npy`
-    -  Predicted Landmark genes expression: `preds.expression.csv`
-
-
+    -  Embeddings for each molecule: `xxx.embeddings.npy`
+    -  Predicted Landmark genes expression: `xxx.pred.exprs.csv`
 
 
 3. Efficacy Score:
@@ -83,7 +81,7 @@ python drug_gnn/hyperopt.py --data_path ${data} --task ${regression}  \
     - 4. Run:
     ```shell
     python efficacy.py --weights GSE92743_Broad_OLS_WEIGHTS_n979x11350.csv \
-                       --predicts preds.expression.csv \
+                       --predicts xxx.pred.exprs.csv \
                        --up up.txt \
                        --down down.txt \
                        --output efficacy.csv
