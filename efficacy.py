@@ -206,9 +206,9 @@ class EfficacyPred:
             raise Exception("Could not understand input data: baseline")
         self._data = L12328_df.copy()
         # compute score
-        if score_type.lower() == 'kolmogorov–smirnov':
+        if statistic.lower() == 'kolmogorov–smirnov':
             cs = self.ks_score(L12328_df, up, down)
-        elif score_type.lower() =='gsea':
+        elif statistic.lower() =='gsea':
             cs = self.gsea_score(L12328_df, up, down, 1.1)
         else:
             raise Exception("Unsupported score_type ! only select from {gsea, kolmogorov–smirnov}")
