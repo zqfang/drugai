@@ -13,8 +13,6 @@ def main():
     parser = ArgumentParser()
     parser.add_argument('--predicts',  type=str, required=True,
                         help='predicted landmark genes expression file')
-    parser.add_argument('--baseline',  type=str, required=True,
-                        help='Path to level3_beta_ctrl_n188708x12323.gctx. Control data for baseline correction')
     parser.add_argument('--weights', type=str, required=True,
                         help='Path to GSE92743_Broad_OLS_WEIGHTS_n979x11350.gctx')
     parser.add_argument('--up', type=str, default=None,
@@ -23,23 +21,25 @@ def main():
                         help='Path to up-regulated genes. One EntrezID per row')
     parser.add_argument('--output', type=str, default=None,
                         help='Path to output file')
+    parser.add_argument('--baseline',  type=str, default=None,
+                        help='Path to level3_beta_ctrl_n188708x12323.gctx. Control data for baseline correction')
+    parser.add_argument('--statistic',  type=str, default='kolmogorov–smirnov', choices={'kolmogorov–smirnov', 'gsea'},
+                        help="Efficacy score type, choose from {'kolmogorov–smirnov', 'gsea'}. Default: kolmogorov–smirnov")
     args = parser.parse_args()
     outfile = Path(args.predicts).stem + ".efficacy.csv"
     if args.output is not None: outfile = args.output
     
     efficacy = EfficacyPred(args.weights, args.up, args.down, baseline=args.baseline)
     preds = pd.read_csv(args.predicts, index_col=0) 
-    efficacy_socres = []
     # overwrite outputfile
     if os.path.exists(outfile): os.remove(outfile)
     # append mode
     output = open(outfile, 'a')
+    output.write("SMILES,es,esup,esdown\n")
     step = 5000
     for i in range(0, len(preds), step):
-        scores = efficacy.compute_score(preds.iloc[i:i+step])
-        #scores.columns = ['ES']
+        scores = efficacy.compute_score(preds.iloc[i:i+step], statistic=args.stat)
         scores.to_csv(output, mode='a', header=False)
-        efficacy_socres.append(scores)
     ## 
     #efficacy_socres = pd.concat(efficacy_socres)
     #efficacy_socres.to_csv(args.output)
@@ -170,14 +170,17 @@ class EfficacyPred:
                             up: List[str] = None, 
                             down: List[str] = None, 
                             baseline: Union[pd.Series, str] = None,
-                            score_type: str = "kolmogorov–smirnov") -> pd.DataFrame:
+                            statistic: str = "kolmogorov–smirnov") -> pd.DataFrame:
         """
-        preds: (num_smiles x 978) prediction output from GNN model
-               row index: SMILE Strings
-               column index: Entrez IDs
-        baseline: shape (12328,). Average expression level of controls. (Level3 data)        
-        up: list of entrezids, or a txt file 
-        down: list of entrzids, or a txt file
+
+        Args::
+            preds: (num_smiles x 978) prediction output from GNN model
+                row index: SMILE Strings
+                column index: Entrez IDs
+            baseline: shape (12328,). Average expression level of controls. (Level3 data)        
+            up: list of entrezids, or a txt file 
+            down: list of entrzids, or a txt file
+            statistic: the efficacy scoring method. kolmogorov–smirnov or gsea.
 
         """
         exprs = self.get_conectivity(preds) # num_smiles x 978
@@ -215,6 +218,8 @@ class EfficacyPred:
     # This file consists of useful functions that are related to cmap
     def ks_score(self,  expression: pd.DataFrame, qup: List[str], qdown: List[str]):
         '''
+        kolmogorov–smirnov score
+
         This function takes qup & qdown, which are lists of gene
         names, and  expression, a panda data frame of the expressions
         of genes as input, and output the connectivity score vector
@@ -274,6 +279,9 @@ class EfficacyPred:
         return ks
 
     def gsea_score(self, expression, up, down, weighted_score):
+        """
+        gsea scoring method
+        """
         # gene_set = up + down
         results = []
         for _, ser in expression.iteritems(): # iter columns
@@ -290,10 +298,12 @@ class EfficacyPred:
 
     def _gsea_score(self, gene_list, correl_vector, gene_set, weighted_score_type=1, 
                     single=False, scale=False):
-        """This is the most important function of GSEApy. It has the same algorithm with GSEA and ssGSEA.
+        """It has the same algorithm with GSEA and ssGSEA.
+
         :param expression: shape [num_smiles, num_genes]
         :param gene_set: up and down gene list (concated)
-        :param weighted_score float: power of w 
+        :param weighted_score_type float: power of floats
+
         :return:
         ES: Enrichment score (real number between -1 and +1)
         """
@@ -305,11 +315,10 @@ class EfficacyPred:
         else:
             correl_vector = np.abs(correl_vector)**weighted_score_type
 
-        # get indices of tag_indicator
-        hit_ind = np.flatnonzero(tag_indicator).tolist()
+        # GSEA Enrichment Score
         Nhint = tag_indicator.sum()
         sum_correl_tag = np.sum(correl_vector*tag_indicator)
-        # compute ES score, the code below is identical to gsea enrichment_score method.
+
         no_tag_indicator = 1 - tag_indicator
         Nmiss =  N - Nhint
         norm_tag =  1.0/sum_correl_tag
@@ -317,14 +326,13 @@ class EfficacyPred:
         RES = np.cumsum(tag_indicator * correl_vector * norm_tag - no_tag_indicator * norm_no_tag)
 
         if scale: RES = RES / N
-        if single:
+        if single: # ssGSEA
             es = RES.sum()
-            return es
         else:
             max_ES, min_ES =  RES.max(), RES.min()
             es =  max_ES if np.abs(max_ES) > np.abs(min_ES) else min_ES 
             # extract values
-            return es
+        return es
 
 
     if __name__ == '__main__':
