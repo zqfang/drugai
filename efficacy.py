@@ -70,7 +70,7 @@ class EfficacyPred:
         map 978 genes to 12328 genes
         Download the weight matrix from GSE92743. This file has correct Entrez id
         GSE92743_Broad_OLS_WEIGHTS_n979x11350.gctx.gz
-        q
+        
         ## Need to figure out what DS_GEO_OLS_WEIGHTS_n979x21290.gctx use for ?
         ## This file are all affymatrix ids, not Entrez id !!!
         ## DS_GEO_OLS_WEIGHTS_n979x21290.gctx: file found in GSE92742_Broad_LINCS_auxiliary_datasets.tar.gz	
@@ -151,16 +151,24 @@ class EfficacyPred:
     def infer_expression(self, landmarks: Union[str, pd.DataFrame]):
         """compute the enrichment/efficacy score
            landmarks: shape (num_smiles, 978), predicted landmark expression
+
+           refer to LINCS 2017 cell paper: Level 3 - Normalization (NORM)
+           basically, it's linear transfermation 
+
+        map 978 genes to 12328 genes
+        Download the weight matrix from GSE92743. 
+        This file has correct Entrez id: GSE92743_Broad_OLS_WEIGHTS_n979x11350.gctx.gz
         """
         # insert offset (bias)
         exprs = landmarks.copy()
         # inplace insert ones in the first column
-        exprs.insert(loc=0, column="OFFSET", value=1) 
+        # exprs.insert(loc=0, column="OFFSET", value=1) 
         # match the order of landmark genes
-        W = self.W.loc[:, exprs.columns] # 11350 x 979
+        W = self.W.loc[:, exprs.columns] # 11350 x 978
         # get predicted 11350 genes' expression of compounds
-        # [D x SIMELS ] = [D x L+1] * [L+1 x SMILES]
-        L11350 = W @ exprs.T # linear transform, infer 11350 genes
+        # [D x SIMELS ] = [D x L] * [L x SMILES] + OFFSET (intercept)
+        # refer to the LINCS 2017 cell paper layer
+        L11350 = W @ exprs.T + self.W.iloc[:,[0]]# linear transform, infer 11350 genes
         # non-negative !
         # L11350.clip(lower=0, inplace=True)
         L12328_df = pd.concat([landmarks.T, L11350]) # note, columns aligned by index automatically
